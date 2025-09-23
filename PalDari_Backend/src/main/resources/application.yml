@@ -1,0 +1,47 @@
+####################################
+# Port & Project Name
+####################################
+server:
+  port: 8080                    # ?? ??
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  application:
+    name: PalDari_Backend       # ???? ??
+
+  output:
+    ansi:
+      enabled: always           # ???? ANSI ?? ?? ??
+
+  devtools:
+    livereload:
+      enabled: true
+    restart:
+      enabled: true
+
+  ####################################
+  # MySQL ??
+  ####################################
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/paldari_db?serverTimezone=UTC&useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: 1234
+
+  ####################################
+  # JPA ??
+  ####################################
+  jpa:
+    open-in-view: true      #
+    hibernate:
+      ddl-auto: update      # create, update, ...
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy # ?????? ?????? ??
+    show-sql: true          # SQL ?? ??
+    properties:
+      hibernate:
+        format_sql: true    # SQL ??? ??
+
