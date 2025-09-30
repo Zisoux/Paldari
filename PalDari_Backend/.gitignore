@@ -35,3 +35,33 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# Flutter
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.dart_tool/
+.packages
+.idea/
+
+# iOS
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+
+# Android
+android/.gradle/
+android/build/
+android/local.properties
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# OS별 불필요 파일
+.DS_Store
+Thumbs.db
+
