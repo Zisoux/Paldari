@@ -1,10 +1,17 @@
-/gradlew text eol=lf
+# 모든 텍스트 파일은 OS별 줄바꿈 자동 처리
+* text=auto
+
+# 텍스트 파일의 줄바꿈은 LF로 고정
+*.sh text eol=lf
+*.dart text eol=lf
+*.java text eol=lf
+*.py text eol=lf
+
+# 특정 확장자 파일은 CRLF로 고정
 *.bat text eol=crlf
+
+# 바이너리 파일은 줄바꿈 처리하지 않음
 *.jar binary
 
-# 모든 텍스트 파일 LF로 고정
-* text=auto eol=lf
-
-# 특정 확장자 예외
-*.sh text eol=lf
-*.bat text eol=crlf
+# 실행 권한이 필요한 쉘 스크립트 파일
+scripts/*.sh eol=lf
