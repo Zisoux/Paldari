@@ -2,19 +2,55 @@
 # Port & Project Name
 ####################################
 server:
-  port: 8080                    # ?? ??
+  port: 8080
   servlet:
     encoding:
       charset: UTF-8
       force: true
 
+app:
+  url: http://localhost:8080   # 운영에선 실제 도메인으로 교체
+  mail:
+    enabled: true              # 기본값(운영용): 전송 ON
+  oauth2:
+    redirect: http://localhost:5173/oauth-success
+
 spring:
   application:
-    name: PalDari_Backend       # ???? ??
+    name: PalDari_Backend
+
+  security:
+    oauth2:
+      redirect: http://localhost:5173/oauth-success   # Flutter web 개발 서버 라우트
+      client:
+        registration:
+          google:
+            client-id: 148127187919-rtquq5ti1l14vqte2drpou34j074om6k.apps.googleusercontent.com
+            client-secret: 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
+            #redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - email
+              - profile
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: paldari2023@gmail.com
+    password: ktbw hjvi ldyf supy   # 2단계 인증 켠 후 앱 비밀번호 사용
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
 
   output:
     ansi:
-      enabled: always           # ???? ANSI ?? ?? ??
+      enabled: always
 
   devtools:
     livereload:
@@ -23,7 +59,7 @@ spring:
       enabled: true
 
   ####################################
-  # MySQL ??
+  # MySQL
   ####################################
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -32,16 +68,16 @@ spring:
     password: 1234
 
   ####################################
-  # JPA ??
+  # JPA
   ####################################
   jpa:
-    open-in-view: true      #
+    open-in-view: true
     hibernate:
       ddl-auto: update      # create, update, ...
       naming:
-        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy # ?????? ?????? ??
-    show-sql: true          # SQL ?? ??
+        physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+    show-sql: true
     properties:
       hibernate:
-        format_sql: true    # SQL ??? ??
+        format_sql: true
 

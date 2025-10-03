@@ -1,36 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
+import 'services/secure_storage.dart';
+import 'services/api_client.dart';
+import 'services/auth_service.dart';
+import 'providers/auth_provider.dart';
+import 'screens/login_screen.dart';
+import 'screens/signup_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/oauth_success_screen.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  if (kIsWeb) {
+    usePathUrlStrategy(); // /oauth-success 형태(해시 제거)
+  }
+  final storage = SecureStorage();
+  final api = ApiClient(storage);
+  final auth = AuthService(api, storage);
+  runApp(MyApp(auth));
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key}); // const 생성자 추가
-
-  // Spring Boot 서버 테스트 함수
-  Future<void> testBackend() async {
-    final url = Uri.parse('http://10.0.2.2:8080/hello'); // Android 에뮬레이터에서 로컬 서버 접근
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      print(response.body); // 콘솔에 Hello World 출력
-    } else {
-      print('Error: ${response.statusCode}');
-    }
-  }
+  final AuthService auth;
+  const MyApp(this.auth, {super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Spring Boot Test')),
-        body: Center(
-          child: ElevatedButton(
-            onPressed: testBackend,       // 버튼 누르면 서버 호출
-            child: const Text('Test Backend'),
-          ),
-        ),
+    return ChangeNotifierProvider(
+      create: (_) => AuthState(auth),
+      child: MaterialApp(
+        title: 'Paldari Auth',
+        routes: {
+          '/': (_) => const LoginScreen(),
+          '/signup': (_) => const SignupScreen(),
+          '/home': (_) => const HomeScreen(),
+          '/oauth-success': (_) => const OAuthSuccessScreen(),
+        },
+        initialRoute: '/',
       ),
     );
   }
 }
-

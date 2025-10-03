@@ -30,7 +30,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.1.0
+  dio: ^5.7.0
+  flutter_secure_storage: ^9.2.2
+  provider: ^6.1.2
+  url_launcher: ^6.3.0
+  # 모바일에서 OAuth 콜백을 커스텀 스킴으로 받으려면 아래 주석 해제
+  # flutter_web_auth_2: ^3.0.4
+
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
