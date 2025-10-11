@@ -1,0 +1,24 @@
+# 1단계: Gradle 빌드 환경
+FROM gradle:8.3-jdk17 AS build
+WORKDIR /app
+
+# Gradle wrapper + build.gradle, settings.gradle 복사
+COPY build.gradle settings.gradle gradle.properties ./
+COPY gradle ./gradle
+COPY src ./src
+
+# 빌드 수행 (테스트 제외)
+RUN gradle clean build -x test
+
+# 2단계: 런타임 환경 (경량 JRE)
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+
+# 1단계에서 빌드한 JAR 파일 복사
+COPY --from=build /app/build/libs/*.jar app.jar
+
+# 외부 접근 포트
+EXPOSE 8080
+
+# Spring Boot 실행
+ENTRYPOINT ["java", "-jar", "app.jar"]
