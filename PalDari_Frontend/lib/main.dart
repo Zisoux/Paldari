@@ -31,13 +31,33 @@ class MyApp extends StatelessWidget {
       create: (_) => AuthState(auth),
       child: MaterialApp(
         title: 'Paldari Auth',
-        routes: {
-          '/': (_) => const LoginScreen(),
-          '/signup': (_) => const SignupScreen(),
-          '/home': (_) => const HomeScreen(),
-          '/oauth-success': (_) => const OAuthSuccessScreen(),
-        },
         initialRoute: '/',
+
+        // query parameter 포함 라우트 처리
+        onGenerateRoute: (settings) {
+          final uri = Uri.parse(settings.name ?? '/');
+
+          if (uri.path == '/oauth-success') {
+            final token = uri.queryParameters['token'];
+            return MaterialPageRoute(
+              builder: (context) => OAuthSuccessScreen(token: token),
+              settings: settings,
+            );
+          }
+
+          switch (uri.path) {
+            case '/':
+              return MaterialPageRoute(builder: (_) => const LoginScreen());
+            case '/signup':
+              return MaterialPageRoute(builder: (_) => const SignupScreen());
+            case '/home':
+              return MaterialPageRoute(builder: (_) => const HomeScreen());
+            default:
+              return MaterialPageRoute(builder: (_) => const LoginScreen());
+          }
+        },
+
+        // 기존 routes 제거 (onGenerateRoute로 통합)
       ),
     );
   }

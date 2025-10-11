@@ -14,6 +14,7 @@ app:
     enabled: true              # 기본값(운영용): 전송 ON
   oauth2:
     redirect: http://localhost:5173/oauth-success
+    fail: http://localhost:5173/oauth-fail
 
 spring:
   application:
@@ -21,18 +22,19 @@ spring:
 
   security:
     oauth2:
-      redirect: http://localhost:5173/oauth-success   # Flutter web 개발 서버 라우트
       client:
         registration:
           google:
             client-id: 148127187919-rtquq5ti1l14vqte2drpou34j074om6k.apps.googleusercontent.com
-            client-secret: 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
-            #redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            client-secret: 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 # 재발급 필요.. 노출됨!
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
+              - openid
               - email
               - profile
         provider:
           google:
+            issuer-uri: https://accounts.google.com
             authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
             token-uri: https://oauth2.googleapis.com/token
             user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo

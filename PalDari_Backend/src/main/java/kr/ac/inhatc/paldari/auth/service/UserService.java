@@ -28,20 +28,37 @@ public class UserService implements UserDetailsService {
     private final MailService mailService;
     private final JwtTokenProvider jwtTokenProvider;
 
-    // 로그인용(UserDetailsService)
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User u = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-        List<GrantedAuthority> auths = List.of(new SimpleGrantedAuthority(u.getRole()));
-        return new org.springframework.security.core.userdetails.User(
-                u.getUsername(),
-                u.getPassword() == null ? "" : u.getPassword(),
-                u.isEnabled(), true, true, true,
-                auths
-        );
+    public UserDetails loadUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .map(u -> new org.springframework.security.core.userdetails.User(
+                        u.getUsername(),
+                        u.getPassword() == null ? "" : u.getPassword(),
+                        u.isEnabled(), true, true, true,
+                        List.of(new SimpleGrantedAuthority(u.getRole()))
+                ))
+                .orElseGet(() -> {
+                    // DB에 없으면 소셜 계정으로 새로 생성
+                    User newUser = new User(
+                            username,
+                            username, // 소셜로그인은 email이 username
+                            null,
+                            "GOOGLE",
+                            true,
+                            "ROLE_USER",
+                            LocalDateTime.now()
+                    );
+                    userRepository.save(newUser);
+                    return new org.springframework.security.core.userdetails.User(
+                            newUser.getUsername(),
+                            "",
+                            true, true, true, true,
+                            List.of(new SimpleGrantedAuthority(newUser.getRole()))
+                    );
+                });
     }
+
+
 
     @Transactional
     public void registerLocalUser(String username, String email, String rawPassword) {
@@ -102,35 +119,6 @@ public class UserService implements UserDetailsService {
             throw new IllegalStateException("Email not verified");
         }
         return jwtTokenProvider.generateToken(u.getUsername());
-    }
-
-    /** (선택) 통합 OAuth2UserService로 옮겼다면 이 메서드는 삭제해도 됩니다. */
-    public UserDetails handleOAuth2Success(org.springframework.security.oauth2.core.user.OAuth2User oauthUser) {
-        String email = (String) oauthUser.getAttributes().getOrDefault("email", null);
-        String username = email != null ? email : "user_" + UUID.randomUUID();
-
-        User user = userRepository.findByUsername(username)
-                .orElseGet(() -> {
-                    User nu = new User(
-                            username,
-                            email != null ? email : (username + "@nomail.local"),
-                            null,
-                            "GOOGLE",
-                            true,
-                            "ROLE_USER",
-                            LocalDateTime.now()
-                    );
-                    return userRepository.save(nu);
-                });
-
-        user.setEnabled(true);
-        user.setProvider("GOOGLE");
-        userRepository.save(user);
-
-        List<GrantedAuthority> auths = List.of(new SimpleGrantedAuthority(user.getRole()));
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(), "", true, true, true, true, auths
-        );
     }
 
     public Map<String, Object> getProfile(String username) {
