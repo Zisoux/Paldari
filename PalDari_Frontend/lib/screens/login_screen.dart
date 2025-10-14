@@ -269,13 +269,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             children: [
                               TextButton(
                                 onPressed: () =>
-                                    Navigator.pushNamed(context, '/find-id'),
+                                    Navigator.pushNamed(context, '/findEmail'),
                                 child: const Text('아이디 찾기'),
                               ),
                               const Text('·'),
                               TextButton(
                                 onPressed: () => Navigator.pushNamed(
-                                    context, '/reset-password'),
+                                    context, '/findPW'),
                                 child: const Text('비밀번호 재설정'),
                               ),
                               const Text('·'),

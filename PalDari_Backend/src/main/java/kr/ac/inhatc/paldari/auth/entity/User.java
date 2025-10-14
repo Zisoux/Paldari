@@ -5,6 +5,7 @@ import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -35,6 +36,18 @@ public class User {
 
     @Column(nullable = false)
     private boolean enabled;  // 이메일 인증 여부
+
+    private String gender;  // 성별
+
+    private LocalDate birthdate;  // 생년월일
+
+    private String country;  // 출신국가
+
+    private String livingIn;  // 거주국가
+
+    private String language;  // 사용하는 언어
+
+    private String introduction;  // 자기소개
 
     @Column(nullable = false)
     private String role = "ROLE_USER"; // 기본 권한

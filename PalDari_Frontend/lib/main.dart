@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:paldari/screens/find_email_screen.dart';
+import 'package:paldari/screens/find_pw_screen.dart';
 import 'package:provider/provider.dart';
 import 'services/secure_storage.dart';
 import 'services/api_client.dart';
@@ -50,6 +52,10 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const LoginScreen());
             case '/signup':
               return MaterialPageRoute(builder: (_) => const SignupScreen());
+            case '/findEmail':
+              return MaterialPageRoute(builder: (_) => const FindEmailScreen());
+            case '/findPW':
+              return MaterialPageRoute(builder: (_) => const FindPwScreen());
             case '/home':
               return MaterialPageRoute(builder: (_) => const HomeScreen());
             default:

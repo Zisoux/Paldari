@@ -12,6 +12,7 @@
         "flutter",
         "flutter_secure_storage",
         "flutter_web_auth_2",
+        "http",
         "provider",
         "url_launcher"
       ],
@@ -566,6 +567,16 @@
       "dependencies": [
         "meta",
         "path"
+      ]
+    },
+    {
+      "name": "http",
+      "version": "1.5.0",
+      "dependencies": [
+        "async",
+        "http_parser",
+        "meta",
+        "web"
       ]
     }
   ],

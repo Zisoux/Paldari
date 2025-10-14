@@ -139,4 +139,43 @@ public class UserService implements UserDetailsService {
         new SecureRandom().nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
+
+    public String findUsername(String email) {
+        User u = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("Email not found"));
+        return u.getUsername();
+    }
+
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email).orElse(null);
+    }
+
+    public User findByUsernameAndEmail(String username, String email) {
+        return userRepository.findByUsernameAndEmail(username, email).orElse(null);
+    }
+
+    /**
+     * 비밀번호 갱신
+     * @param username 사용자 ID
+     * @param email 이메일 (추가 확인용)
+     * @param encodedPassword 암호화된 비밀번호 (BCrypt 등)
+     */
+    @Transactional
+    public void updatePasswordByUsernameAndEmail(String username, String email, String encodedPassword) {
+        User user = userRepository.findByUsernameAndEmail(username, email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자 정보를 찾을 수 없습니다."));
+
+        user.setPassword(encodedPassword);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void updatePasswordRaw(String username, String email, String rawPassword) {
+        User user = userRepository.findByUsernameAndEmail(username, email)
+                .orElseThrow(() -> new IllegalArgumentException("사용자 정보를 찾을 수 없습니다."));
+
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        userRepository.save(user);
+    }
+
 }
