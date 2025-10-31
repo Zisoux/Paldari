@@ -1,5 +1,6 @@
 // lib/screens/post_detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart'; // 👈 404 감지용
 import '../services/api.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -52,17 +53,35 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
     try {
       final p = await api.fetchPost(widget.postId);
+      if (!mounted) return;
       setState(() {
         post = p;
       });
+    } on DioException catch (e) {
+      // ✅ 404면 이미 삭제된 게시글: 안내 후 목록으로 복귀 + 'deleted' 신호
+      if (e.response?.statusCode == 404) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미 삭제된 게시글입니다.')),
+        );
+        Navigator.of(context).pop('deleted');
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        postError = e.toString();
+      });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         postError = e.toString();
       });
     } finally {
-      setState(() {
-        loadingPost = false;
-      });
+      if (mounted) {
+        setState(() {
+          loadingPost = false;
+        });
+      }
     }
   }
 
@@ -73,17 +92,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
     try {
       final list = await api.fetchComments(widget.postId);
+      if (!mounted) return;
       setState(() {
         comments = list;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         commentsError = e.toString();
       });
     } finally {
-      setState(() {
-        loadingComments = false;
-      });
+      if (mounted) {
+        setState(() {
+          loadingComments = false;
+        });
+      }
     }
   }
 
@@ -95,15 +118,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
     setState(() => submittingComment = true);
     try {
-      final created = await api.createComment(widget.postId, content: text);
+      await api.createComment(widget.postId, content: text);
       _commentController.clear();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('댓글 작성 완료')));
-      // 새로 불러오기 (간단)
       await _loadComments();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('댓글 작성 실패: $e')));
     } finally {
-      setState(() => submittingComment = false);
+      if (mounted) setState(() => submittingComment = false);
     }
   }
 
@@ -125,13 +149,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     setState(() => submittingEdit = true);
     try {
       await api.updateComment(widget.postId, id, content: txt);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('댓글 수정 완료')));
       setState(() => editingCommentId = null);
       await _loadComments();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('수정 실패: $e')));
     } finally {
-      setState(() => submittingEdit = false);
+      if (mounted) setState(() => submittingEdit = false);
     }
   }
 
@@ -150,9 +176,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (ok != true) return;
     try {
       await api.deleteComment(widget.postId, commentId);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('삭제되었습니다')));
       await _loadComments();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
     }
   }
@@ -172,9 +200,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (ok != true) return;
     try {
       await api.deletePost(widget.postId);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물이 삭제되었습니다')));
-      Navigator.of(context).pop(true); // 목록으로 복귀
+      // ✅ 목록 화면이 새로고침하도록 'deleted'로 결과 전달
+      Navigator.of(context).pop('deleted');
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
     }
   }
@@ -222,7 +253,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween, // ✅ 수정 완료
               children: [
                 const Text('댓글', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 Text('${comments.length}'),
@@ -276,7 +307,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           ),
                         if (isEditing)
                           IconButton(
-                            icon: submittingEdit ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check, size: 20),
+                            icon: submittingEdit
+                                ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                                : const Icon(Icons.check, size: 20),
                             onPressed: submittingEdit ? null : _submitEdit,
                             tooltip: '저장',
                           ),
@@ -307,7 +344,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: submittingComment ? null : _submitComment,
-                    child: submittingComment ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('작성'),
+                    child: submittingComment
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('작성'),
                   ),
                 ],
               ),

@@ -64,8 +64,12 @@ class ApiService {
   }
 
   Future<void> deletePost(int id) async {
-    await dio.delete('/api/posts/$id');
+    final resp = await dio.delete('/api/posts/$id');
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      throw Exception('삭제 실패 (code: ${resp.statusCode})');
+    }
   }
+
 
   // --- Comments ---
   Future<List<Map<String, dynamic>>> fetchComments(int postId) async {
