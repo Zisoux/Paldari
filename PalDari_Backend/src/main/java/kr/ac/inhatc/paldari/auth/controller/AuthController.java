@@ -63,7 +63,7 @@ public class AuthController {
 
     // ---- Endpoints ----
 
-    /** 회원가입: 비활성로 저장 후 인증메일 발송 */
+    /** 회원가입: 비활성으로 저장 후 인증메일 발송 */
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@Valid @RequestBody SignUpRequest req) {
         userService.registerLocalUser(req.username(), req.email(), req.password());
@@ -91,7 +91,7 @@ public class AuthController {
         }
     }
 
-    // (네가 임시로 넣어둔) 아이디 찾기: 이메일 존재 여부 확인
+    // 아이디 찾기: 이메일 존재 여부 확인
     @PostMapping("/findEmail")
     public ResponseEntity<?> findEmail(@RequestBody Map<String, String> body) {
         String email = body.getOrDefault("email", "").trim();

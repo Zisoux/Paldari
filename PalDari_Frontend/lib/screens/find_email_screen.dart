@@ -134,7 +134,7 @@ class _FindEmailScreenState extends State<FindEmailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              '아이디 / 비밀번호 찾기',
+                              '아이디 찾기',
                               style: TextStyle(
                                 color: Colors.black,
                                 fontSize: 32 * scale,
