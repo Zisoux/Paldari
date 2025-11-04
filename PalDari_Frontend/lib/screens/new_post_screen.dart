@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 import '../services/api.dart';
 
 class NewPostScreen extends StatefulWidget {
-  const NewPostScreen({Key? key}) : super(key: key);
+  final String? initialCountry;
+  final String? initialCategory;
+
+  const NewPostScreen({
+    Key? key,
+    this.initialCountry,
+    this.initialCategory,
+  }) : super(key: key);
 
   @override
   State<NewPostScreen> createState() => _NewPostScreenState();
@@ -12,13 +19,27 @@ class _NewPostScreenState extends State<NewPostScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
+
+  late TextEditingController _countryCtrl;
+  late TextEditingController _categoryCtrl;
+
   bool submitting = false;
   final api = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    _countryCtrl = TextEditingController(text: widget.initialCountry ?? '');
+    _categoryCtrl = TextEditingController(text: widget.initialCategory ?? '');
+  }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _contentCtrl.dispose();
+    _countryCtrl.dispose();
+    _categoryCtrl.dispose();
+
     super.dispose();
   }
 
@@ -49,6 +70,18 @@ class _NewPostScreenState extends State<NewPostScreen> {
           key: _formKey,
           child: Column(
             children: [
+              TextFormField(
+                controller: _countryCtrl,
+                decoration: const InputDecoration(labelText: '국가'),
+                readOnly: true, // 🔸 선택한 탭 값 그대로 표시
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _categoryCtrl,
+                decoration: const InputDecoration(labelText: '카테고리'),
+                readOnly: true,
+              ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _titleCtrl,
                 decoration: InputDecoration(labelText: '제목'),

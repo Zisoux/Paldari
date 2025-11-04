@@ -16,8 +16,10 @@ class _PostsScreenState extends State<PostsScreen> {
   List<Map<String, dynamic>> posts = [];
   String? error;
 
-  // 🔹 상단 탭 목록
+  // 🔹 국가 탭 & 카테고리 탭
+  final List<String> countries = ['한국', '일본', '말레이시아'];
   final List<String> categories = ['전체', '생활', '학업', '지역', '안전', '취업'];
+  String selectedCountry = '한국';
   String selectedCategory = '전체';
 
   @override
@@ -48,8 +50,14 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   Future<void> _onCreatePressed() async {
+    // 🔸 현재 선택된 국가/카테고리 값을 전달
     final created = await Navigator.of(context).push<int>(
-      MaterialPageRoute(builder: (_) => const NewPostScreen()),
+      MaterialPageRoute(
+        builder: (_) => NewPostScreen(
+          initialCountry: selectedCountry,
+          initialCategory: selectedCategory,
+        ),
+      ),
     );
 
     if (created != null) {
@@ -104,13 +112,15 @@ class _PostsScreenState extends State<PostsScreen> {
     }
   }
 
-  // 🔹 카테고리 필터링
+  // 🔹 국가 + 카테고리 필터
   List<Map<String, dynamic>> get filteredPosts {
-    if (selectedCategory == '전체') return posts;
-    return posts
-        .where((p) =>
-    (p['category']?.toString().contains(selectedCategory) ?? false))
-        .toList();
+    return posts.where((p) {
+      final countryMatch = (p['country'] ?? '').contains(selectedCountry);
+      final categoryMatch = selectedCategory == '전체'
+          ? true
+          : (p['category'] ?? '').contains(selectedCategory);
+      return countryMatch && categoryMatch;
+    }).toList();
   }
 
   @override
@@ -135,7 +145,48 @@ class _PostsScreenState extends State<PostsScreen> {
         onRefresh: _load,
         child: Column(
           children: [
-            // 🔸 상단 카테고리 탭
+            // 🔸 1. 국가 선택 탭
+            Container(
+              height: 45,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: countries.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  final c = countries[i];
+                  final isSelected = c == selectedCountry;
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() => selectedCountry = c);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF260101)
+                            : const Color(0xFFF2F2F2),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Text(
+                        c,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF595959),
+                          fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // 🔸 2. 카테고리 탭
             Container(
               height: 45,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -268,7 +319,7 @@ class _PostsScreenState extends State<PostsScreen> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              '작성자: ${p['memberId'] ?? '-'} · ${p['createdAt'] ?? ''}',
+                              '${p['country'] ?? '국가 미지정'} · ${p['category'] ?? '카테고리 없음'}\n작성자: ${p['memberId'] ?? '-'} · ${p['createdAt'] ?? ''}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
