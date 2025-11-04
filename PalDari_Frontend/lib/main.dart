@@ -57,7 +57,7 @@ class MyApp extends StatelessWidget {
             case '/findPW':
               return MaterialPageRoute(builder: (_) => const FindPwScreen());
             case '/home':
-              return MaterialPageRoute(builder: (_) => const HomeScreen());
+              return MaterialPageRoute(builder: (_) => const PalHomeScreen());
             default:
               return MaterialPageRoute(builder: (_) => const LoginScreen());
           }
