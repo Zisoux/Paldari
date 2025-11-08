@@ -1,8 +1,8 @@
-package kr.ac.inhatc.paldari.domain.comment;
+package kr.ac.inhatc.paldari.community.domain.comment;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import kr.ac.inhatc.paldari.domain.post.Post;
+import kr.ac.inhatc.paldari.community.domain.post.Post;
 
 @Entity
 @Table(name = "comments")

@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.domain.comment;
+package kr.ac.inhatc.paldari.community.domain.comment;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,10 +8,10 @@ import org.springframework.http.HttpStatus;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import kr.ac.inhatc.paldari.domain.post.PostRepository;
-import kr.ac.inhatc.paldari.domain.post.Post;
-import kr.ac.inhatc.paldari.web.dto.CommentRequest;
-import kr.ac.inhatc.paldari.web.dto.CommentResponse;
+import kr.ac.inhatc.paldari.community.domain.post.PostRepository;
+import kr.ac.inhatc.paldari.community.domain.post.Post;
+import kr.ac.inhatc.paldari.community.web.dto.CommentRequest;
+import kr.ac.inhatc.paldari.community.web.dto.CommentResponse;
 
 @Service
 @Transactional

@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.web.controller;
+package kr.ac.inhatc.paldari.community.web.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -7,9 +7,9 @@ import jakarta.validation.Valid;
 
 import java.util.List;
 
-import kr.ac.inhatc.paldari.domain.post.PostService;
-import kr.ac.inhatc.paldari.web.dto.PostRequest;
-import kr.ac.inhatc.paldari.web.dto.PostResponse;
+import kr.ac.inhatc.paldari.community.domain.post.PostService;
+import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
+import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 
 @RestController
 @RequestMapping("/api/posts")

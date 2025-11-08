@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.web.dto;
+package kr.ac.inhatc.paldari.community.web.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

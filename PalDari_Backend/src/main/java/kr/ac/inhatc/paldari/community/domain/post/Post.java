@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.domain.post;
+package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;

@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.domain.post;
+package kr.ac.inhatc.paldari.community.domain.post;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -12,8 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-import kr.ac.inhatc.paldari.web.dto.PostRequest;
-import kr.ac.inhatc.paldari.web.dto.PostResponse;
+import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
+import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 
 @Service
 @RequiredArgsConstructor

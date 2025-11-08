@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.web.controller;
+package kr.ac.inhatc.paldari.community.web.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -9,9 +9,9 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 
-import kr.ac.inhatc.paldari.domain.comment.CommentService;
-import kr.ac.inhatc.paldari.web.dto.CommentRequest;
-import kr.ac.inhatc.paldari.web.dto.CommentResponse;
+import kr.ac.inhatc.paldari.community.domain.comment.CommentService;
+import kr.ac.inhatc.paldari.community.web.dto.CommentRequest;
+import kr.ac.inhatc.paldari.community.web.dto.CommentResponse;
 
 @RestController
 @RequestMapping("/api/posts/{postId}/comments")

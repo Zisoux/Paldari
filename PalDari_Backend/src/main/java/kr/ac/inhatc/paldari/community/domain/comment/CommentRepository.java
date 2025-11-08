@@ -1,4 +1,4 @@
-package kr.ac.inhatc.paldari.domain.comment;
+package kr.ac.inhatc.paldari.community.domain.comment;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
