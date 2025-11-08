@@ -12,6 +12,7 @@ import 'screens/home_screen.dart';
 import 'screens/oauth_success_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'screens/posts_screen.dart'; // 파일 경로가 lib/screens/posts_screen.dart 여야 함
 
 void main() {
   if (kIsWeb) {
@@ -20,6 +21,7 @@ void main() {
   final storage = SecureStorage();
   final api = ApiClient(storage);
   final auth = AuthService(api, storage);
+
   runApp(MyApp(auth));
 }
 
@@ -58,6 +60,8 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const FindPwScreen());
             case '/home':
               return MaterialPageRoute(builder: (_) => const PalHomeScreen());
+            case '/posts':
+              return MaterialPageRoute(builder: (_) => const PostsScreen());
             default:
               return MaterialPageRoute(builder: (_) => const LoginScreen());
           }
