@@ -1,5 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import '../services/api.dart';
+import 'package:provider/provider.dart';
+
+import '../services/api_client.dart';       // ✅ ApiClient 사용(토큰 자동 첨부)
 import 'new_post_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -11,7 +14,6 @@ class PostsScreen extends StatefulWidget {
 }
 
 class _PostsScreenState extends State<PostsScreen> {
-  final api = ApiService();
   bool loading = true;
   List<Map<String, dynamic>> posts = [];
   String? error;
@@ -33,25 +35,28 @@ class _PostsScreenState extends State<PostsScreen> {
       loading = true;
       error = null;
     });
+
     try {
-      final res = await api.fetchPosts();
+      final api = context.read<ApiClient>();             // ✅ 공용 dio
+      final res = await api.dio.get('/api/posts');       // GET은 공개(permitAll)
       setState(() {
-        posts = res;
+        posts = List<Map<String, dynamic>>.from(res.data as List);
+      });
+    } on DioException catch (e) {
+      setState(() {
+        error =
+        '목록 실패 (${e.response?.statusCode ?? e.type}): ${e.response?.data ?? e.message}';
       });
     } catch (e) {
-      setState(() {
-        error = e.toString();
-      });
+      setState(() => error = e.toString());
     } finally {
-      setState(() {
-        loading = false;
-      });
+      setState(() => loading = false);
     }
   }
 
   Future<void> _onCreatePressed() async {
-    // 🔸 현재 선택된 국가/카테고리 값을 전달
-    final created = await Navigator.of(context).push<int>(
+    // 🔸 현재 선택된 국가/카테고리 값을 작성 화면으로 전달
+    final createdId = await Navigator.of(context).push<int>(
       MaterialPageRoute(
         builder: (_) => NewPostScreen(
           initialCountry: selectedCountry,
@@ -60,10 +65,10 @@ class _PostsScreenState extends State<PostsScreen> {
       ),
     );
 
-    if (created != null) {
+    if (createdId != null) {
       final result = await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => PostDetailScreen(postId: created),
+          builder: (_) => PostDetailScreen(postId: createdId),
         ),
       );
       if (result == 'deleted' || result == 'updated') {
@@ -97,17 +102,26 @@ class _PostsScreenState extends State<PostsScreen> {
 
     if (ok == true) {
       try {
-        await api.deletePost(postId);
+        final api = context.read<ApiClient>();           // ✅ 토큰 자동 첨부
+        final resp = await api.dio.delete('/api/posts/$postId');
+        if (resp.statusCode != 200 && resp.statusCode != 204) {
+          throw Exception('code ${resp.statusCode}');
+        }
         await _load();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('게시글이 삭제되었습니다.')),
         );
+      } on DioException catch (e) {
+        if (!mounted) return;
+        final msg = e.response?.statusCode == 401
+            ? '삭제 실패: 로그인 후 다시 시도해 주세요 (401)'
+            : '삭제 실패 (${e.response?.statusCode ?? e.type}): ${e.response?.data ?? e.message}';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('삭제 실패: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
       }
     }
   }
@@ -115,10 +129,10 @@ class _PostsScreenState extends State<PostsScreen> {
   // 🔹 국가 + 카테고리 필터
   List<Map<String, dynamic>> get filteredPosts {
     return posts.where((p) {
-      final countryMatch = (p['country'] ?? '').contains(selectedCountry);
+      final countryMatch = (p['country'] ?? '').toString().contains(selectedCountry);
       final categoryMatch = selectedCategory == '전체'
           ? true
-          : (p['category'] ?? '').contains(selectedCategory);
+          : (p['category'] ?? '').toString().contains(selectedCategory);
       return countryMatch && categoryMatch;
     }).toList();
   }
@@ -157,26 +171,18 @@ class _PostsScreenState extends State<PostsScreen> {
                   final c = countries[i];
                   final isSelected = c == selectedCountry;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() => selectedCountry = c);
-                    },
+                    onTap: () => setState(() => selectedCountry = c),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF260101)
-                            : const Color(0xFFF2F2F2),
+                        color: isSelected ? const Color(0xFF260101) : const Color(0xFFF2F2F2),
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Text(
                         c,
                         style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF595959),
-                          fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? Colors.white : const Color(0xFF595959),
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                           fontSize: 14,
                         ),
                       ),
@@ -198,26 +204,18 @@ class _PostsScreenState extends State<PostsScreen> {
                   final c = categories[i];
                   final isSelected = c == selectedCategory;
                   return GestureDetector(
-                    onTap: () {
-                      setState(() => selectedCategory = c);
-                    },
+                    onTap: () => setState(() => selectedCategory = c),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFFFAAD55)
-                            : const Color(0xFFF2F2F2),
+                        color: isSelected ? const Color(0xFFFAAD55) : const Color(0xFFF2F2F2),
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Text(
                         c,
                         style: TextStyle(
-                          color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF595959),
-                          fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? Colors.white : const Color(0xFF595959),
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                           fontSize: 14,
                         ),
                       ),
@@ -237,8 +235,7 @@ class _PostsScreenState extends State<PostsScreen> {
                   ? Center(child: Text('에러: $error'))
                   : filteredPosts.isEmpty
                   ? ListView(
-                physics:
-                const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
                   SizedBox(height: 200),
                   Center(
@@ -250,66 +247,53 @@ class _PostsScreenState extends State<PostsScreen> {
                 ],
               )
                   : ListView.builder(
-                padding: const EdgeInsets.symmetric(
-                    vertical: 8, horizontal: 12),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                 itemCount: filteredPosts.length,
                 itemBuilder: (_, i) {
                   final p = filteredPosts[i];
                   return GestureDetector(
                     onTap: () async {
-                      final result = await Navigator.of(context)
-                          .push(
+                      final result = await Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => PostDetailScreen(
-                            postId:
-                            (p['id'] as num).toInt(),
+                            postId: (p['id'] as num).toInt(),
                           ),
                         ),
                       );
-                      if (result == 'deleted' ||
-                          result == 'updated') {
+                      if (result == 'deleted' || result == 'updated') {
                         await _load();
                       }
                     },
                     child: Card(
-                      margin: const EdgeInsets.symmetric(
-                          vertical: 8),
+                      margin: const EdgeInsets.symmetric(vertical: 8),
                       elevation: 2,
                       shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(16),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              mainAxisAlignment:
-                              MainAxisAlignment
-                                  .spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  p['title'] ?? '무제',
+                                  (p['title'] ?? '무제').toString(),
                                   style: const TextStyle(
                                     fontSize: 18,
-                                    fontWeight:
-                                    FontWeight.w600,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.redAccent),
-                                  onPressed: () => _deletePost(
-                                      (p['id'] as num)
-                                          .toInt()),
+                                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                                  onPressed: () => _deletePost((p['id'] as num).toInt()),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              p['content'] ?? '',
+                              (p['content'] ?? '').toString(),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(

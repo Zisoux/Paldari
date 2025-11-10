@@ -27,6 +27,7 @@ dependencies:
 
   # OAuth(모바일/데스크탑용 콜백 스킴 처리)
   flutter_web_auth_2: ^4.1.0
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

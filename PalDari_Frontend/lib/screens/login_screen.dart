@@ -81,11 +81,22 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit(AuthState auth) async {
+    if (auth.loading) return; // 중복 제출 방지
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
-    final ok = await context.read<AuthState>().login(idCtrl.text, pwCtrl.text);
-    if (ok && mounted) {
+
+    final id = idCtrl.text.trim();
+    final pw = pwCtrl.text.trim();
+
+    final ok = await context.read<AuthState>().login(id, pw);
+    if (!mounted) return;
+
+    if (ok) {
       Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      // 실패 메시지는 auth.error에도 들어가지만, 스낵바로도 한 번 알림
+      final msg = context.read<AuthState>().error ?? '로그인에 실패했어요.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
@@ -96,19 +107,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final viewWidth = media.size.width;
     final scale = (viewWidth / 411).clamp(0.9, 1.1);
 
-    // 내부(카드 안) 패딩
-    final hPad = 24 * scale;
+    final hPad = 24 * scale; // 카드 내부 패딩
     final vPad = 28 * scale;
-
-    // 화면 바깥 여백(카드와 화면 가장자리 사이 간격)
-    final outerHPad = 20 * scale;
+    final outerHPad = 20 * scale; // 화면 바깥 여백
 
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       resizeToAvoidBottomInset: true,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          // 카드의 최대 너비 제한 (폰에서는 꽉 차지 않도록)
           double maxCardWidth =
           (constraints.maxWidth - outerHPad * 2).clamp(320.0, 420.0);
 
@@ -117,7 +124,6 @@ class _LoginScreenState extends State<LoginScreen> {
             color: const Color(0xFFFFF7F1),
             child: SafeArea(
               child: SingleChildScrollView(
-                // 화면 바깥 여백
                 padding: EdgeInsets.symmetric(
                   horizontal: outerHPad,
                   vertical: outerHPad,
@@ -125,7 +131,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     maxWidth: maxCardWidth,
-                    // 뷰포트 높이만큼 최소 확보(세로 중앙 정렬 + 오버플로우 방지)
                     minHeight: constraints.maxHeight - (outerHPad * 2),
                   ),
                   child: Center(
@@ -139,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center, // 세로 중앙
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // Pal다리 로고
@@ -169,8 +174,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
-
-                          // 로고 아래 여백
                           SizedBox(height: 56 * scale),
 
                           // 폼
@@ -228,15 +231,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(height: 8 * scale),
                           ],
 
-                          // 로그인 버튼 (살짝 낮춤)
+                          // 로그인 버튼
                           SizedBox(
                             height: 50 * scale,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: _loginFill,
                                 borderRadius: BorderRadius.circular(100),
-                                border:
-                                Border.all(color: _borderColor, width: 1),
+                                border: Border.all(
+                                    color: _borderColor, width: 1),
                               ),
                               child: TextButton(
                                 onPressed:
@@ -268,19 +271,25 @@ class _LoginScreenState extends State<LoginScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.pushNamed(context, '/findEmail'),
+                                onPressed: auth.loading
+                                    ? null
+                                    : () => Navigator.pushNamed(
+                                    context, '/findEmail'),
                                 child: const Text('아이디 찾기'),
                               ),
                               const Text('·'),
                               TextButton(
-                                onPressed: () => Navigator.pushNamed(
+                                onPressed: auth.loading
+                                    ? null
+                                    : () => Navigator.pushNamed(
                                     context, '/findPW'),
                                 child: const Text('비밀번호 재설정'),
                               ),
                               const Text('·'),
                               TextButton(
-                                onPressed: () =>
+                                onPressed: auth.loading
+                                    ? null
+                                    : () =>
                                     Navigator.pushNamed(context, '/signup'),
                                 child: const Text('회원가입'),
                               ),
@@ -324,10 +333,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               children: [
                                 InkWell(
                                   borderRadius: BorderRadius.circular(48),
-                                  onTap: () async {
+                                  onTap: auth.loading
+                                      ? null
+                                      : () async {
                                     await launchUrl(
                                       Uri.parse(oauthGoogleUrl),
-                                      mode: LaunchMode.externalApplication,
+                                      mode: LaunchMode
+                                          .externalApplication,
                                     );
                                   },
                                   child: Container(
@@ -338,7 +350,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         width: 1,
-                                        color: Colors.black.withValues(alpha: 0.25),
+                                        // ⛏ withValues → withOpacity 로 수정
+                                        color: Colors.black.withOpacity(0.25),
                                       ),
                                     ),
                                     alignment: Alignment.center,
@@ -363,7 +376,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
 
-                          // 하단 여백 0 → overflow 방지
                           const SizedBox(height: 0),
                         ],
                       ),

@@ -158,7 +158,8 @@ class PalCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
-        // TODO: navigate to Pal detail or chat
+        // ✅ Pal 카드 클릭 시 게시판(/posts) 화면으로 이동
+        Navigator.of(context).pushNamed('/posts');
       },
       child: Ink(
         decoration: BoxDecoration(
@@ -289,7 +290,16 @@ class _PalBottomNav extends StatelessWidget {
         NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '마이페이지'),
       ],
       onDestinationSelected: (i) {
-        // TODO: wire navigation or use go_router
+        switch (i) {
+          case 0:
+            Navigator.of(context).pushReplacementNamed('/home');
+            break;
+          case 3: // ✅ 커뮤니티 탭 선택 시
+            Navigator.of(context).pushReplacementNamed('/posts');
+            break;
+          default:
+            break;
+        }
       },
     );
   }

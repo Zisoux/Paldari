@@ -50,10 +50,14 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (req, res, e) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .authorizeHttpRequests(reg -> reg
-                        .requestMatchers(HttpMethod.OPTIONS, "/api/**", "/oauth2/**", "/login/oauth2/**").permitAll()
+                        //.requestMatchers(HttpMethod.OPTIONS, "/api/**", "/oauth2/**", "/login/oauth2/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/verify").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/oauth2/**", "/login/oauth2/**", "/oauth-success").permitAll()
+                        .requestMatchers("/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
@@ -76,11 +80,14 @@ public class SecurityConfig {
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "http://127.0.0.1:5173"
         ));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
-        cfg.setAllowedHeaders(List.of("Authorization","Content-Type","X-Requested-With"));
-        cfg.setExposedHeaders(List.of("Authorization"));
+       // cfg.setAllowedHeaders(List.of("Authorization","Content-Type","X-Requested-With"));
+       // cfg.setExposedHeaders(List.of("Authorization"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setExposedHeaders(List.of("Authorization", "Location"));
         cfg.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

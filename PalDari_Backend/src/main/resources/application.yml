@@ -8,6 +8,16 @@ server:
       charset: UTF-8
       force: true
 
+logging:
+  level:
+    org.springframework.security: DEBUG
+    kr.ac.inhatc.paldari: DEBUG
+
+
+  error:
+    include-message: always
+    include-binding-errors: always
+
 app:
   url: http://localhost:8080   # 운영에선 실제 도메인으로 교체
   mail:
@@ -82,4 +92,5 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
 
