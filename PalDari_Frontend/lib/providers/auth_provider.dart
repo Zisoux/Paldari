@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../config.dart';            // ✅ apiBase 정의 (예: http://10.0.2.2:8080)
+import '../config.dart';            // apiBase (예: http://10.0.2.2:8080)
 import '../services/auth_service.dart';
 
 /// /api/auth/findEmail 응답 해석 결과
@@ -10,6 +10,7 @@ class FindEmailResult {
   final bool exists;        // 가입된 이메일인지
   final String? username;   // 서버에서 받은 아이디(또는 메시지에서 파싱)
   final String message;     // 서버 메시지 (UI에 그대로 표출 가능)
+
   FindEmailResult({
     required this.exists,
     required this.username,
@@ -24,9 +25,25 @@ class AuthState with ChangeNotifier {
   Map<String, dynamic>? profile;
   String? error;
 
+  String? _accessToken; // ✅ STOMP, API 등에서 쓸 현재 토큰 캐시
+
   AuthState(this._auth);
 
-  // ---------------- 공통 유틸 ----------------
+  /// STOMP / HTTP 어디서든 가져다 쓰는 현재 액세스 토큰
+  String? get accessToken => _accessToken;
+
+  /// 현재 로그인한 유저 아이디 (백엔드 me() 응답 기준)
+  String? get username =>
+      (profile?['username'] as String?)?.trim().isNotEmpty == true
+          ? (profile?['username'] as String?)!.trim()
+          : null;
+
+  // ---------------- 내부 유틸 ----------------
+
+  Future<void> _syncTokenFromAuthService() async {
+    // ⛏ AuthService에 getToken() 구현해서 SecureStorage에서 읽어오도록 해줘.
+    _accessToken = await _auth.getToken();
+  }
 
   String _extractMsg(String body) {
     try {
@@ -34,14 +51,13 @@ class AuthState with ChangeNotifier {
       final raw = (m['message'] ?? m['error'] ?? '').toString();
       return raw.trim();
     } catch (_) {
-      // 서버가 text/plain을 줄 수도 있으므로 body 자체를 사용
       return body.trim();
     }
   }
 
   String? _parseUsernameFromMessage(String msg) {
     // 예: "가입된 이메일입니다. (아이디: myUser )"
-    final key = '아이디';
+    const key = '아이디';
     final idxKey = msg.indexOf(key);
     if (idxKey < 0) return null;
 
@@ -60,57 +76,97 @@ class AuthState with ChangeNotifier {
   // ---------------- 인증 기본 흐름 ----------------
 
   Future<void> signup(String u, String e, String p) async {
-    loading = true; error = null; notifyListeners();
+    loading = true;
+    error = null;
+    notifyListeners();
     try {
       await _auth.signup(username: u, email: e, password: p);
     } catch (e) {
       error = e.toString();
     } finally {
-      loading = false; notifyListeners();
+      loading = false;
+      notifyListeners();
     }
   }
 
   Future<bool> login(String u, String p) async {
-    loading = true; error = null; notifyListeners();
+    loading = true;
+    error = null;
+    notifyListeners();
+
     try {
+      // 1) 로그인 (실패하면 여기서 문자열 예외 던져짐)
       await _auth.login(username: u, password: p);
-      await loadProfile();
+
+      // 2) 토큰 싱크
+      await _syncTokenFromAuthService();
+
+      // 3) 프로필은 조용히 시도 (실패해도 로그인 성공은 유지)
+      await _loadProfileSilently();
+
       return true;
     } catch (e) {
+      // 여기서 잡히는 건 "진짜 로그인 실패"만.
       error = e.toString();
       return false;
     } finally {
-      loading = false; notifyListeners();
+      loading = false;
+      notifyListeners();
     }
   }
 
+
+
+  // 화면에서 직접 호출해서 "내 정보" 갱신하고 싶을 때 사용하는 버전
   Future<void> loadProfile() async {
-    loading = true; error = null; notifyListeners();
+    loading = true;
+    error = null;
+    notifyListeners();
     try {
       profile = await _auth.me();
     } catch (e) {
+      // 여기서는 에러를 사용자에게 보여줘도 됨
       error = e.toString();
     } finally {
-      loading = false; notifyListeners();
+      loading = false;
+      notifyListeners();
     }
   }
 
+// 로그인 직후 내부에서만 쓰는 조용한 버전
+  Future<void> _loadProfileSilently() async {
+    try {
+      profile = await _auth.me();
+    } catch (e) {
+      // ❗여기서는 error를 건드리지 않음 (DioException 안 보이게)
+      if (kDebugMode) {
+        print('loadProfile failed silently: $e');
+      }
+    }
+  }
+
+
+
+  /// OAuth 콜백 등에서 토큰 바로 주입되는 경우
   Future<void> setTokenFromCallback(String token) async {
+    // AuthService가 토큰을 저장
     await _auth.saveTokenFromCallback(token);
+
+    // 메모리 캐시도 동기화
+    _accessToken = token;
+
     await loadProfile();
   }
 
   Future<void> logout() async {
     await _auth.logout();
     profile = null;
+    _accessToken = null;
     notifyListeners();
   }
 
-  // ---------------- 아이디 찾기(이메일로 확인) ----------------
+  // ---------------- 아이디 찾기 (이메일 기반) ----------------
 
-  /// 백엔드: POST /api/auth/findEmail { email }
-  /// - 권장: 200 OK + {exists, username, message}
-  /// - 레거시: 400 + "가입된 이메일입니다. (아이디: xxx )"
   Future<FindEmailResult> checkEmailAndFetchUsername(String email) async {
     error = null;
     try {
@@ -129,14 +185,12 @@ class AuthState with ChangeNotifier {
       String? username;
 
       if (res.statusCode == 200) {
-        // JSON 응답(권장)
         try {
           final data = jsonDecode(res.body) as Map<String, dynamic>;
           exists = (data['exists'] as bool?) ?? false;
           username = (data['username'] as String?) ??
               (data['usernameMasked'] as String?);
         } catch (_) {
-          // 파싱 실패 시 메시지 기반 폴백
           if (msg.contains('가입된 이메일')) {
             exists = true;
             username = _parseUsernameFromMessage(msg);
@@ -145,7 +199,6 @@ class AuthState with ChangeNotifier {
           }
         }
       } else {
-        // 레거시(400) 메시지 기반
         if (msg.contains('가입된 이메일')) {
           exists = true;
           username = _parseUsernameFromMessage(msg);
@@ -183,19 +236,16 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  /// 존재 여부만 필요할 때
   Future<bool> checkEmailExists(String email) async {
     final res = await checkEmailAndFetchUsername(email);
     return res.exists;
   }
 
-  // ---------------- 비밀번호 재설정 (2-엔드포인트 버전) ----------------
-  // POST /api/auth/pw-reset/request  {username, email}
-  // POST /api/auth/pw-reset/confirm  {username, email, code, newPassword}
+  // ---------------- 비밀번호 재설정 ----------------
 
-  /// 1) 인증코드 요청
   Future<bool> requestPwResetCode(String username, String email) async {
-    error = null; notifyListeners();
+    error = null;
+    notifyListeners();
     try {
       final uri = Uri.parse('$apiBase/api/auth/pw-reset/request');
       final res = await http
@@ -223,14 +273,14 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  /// 2) 코드 + 새 비번으로 즉시 변경
   Future<bool> resetPasswordWithCode({
     required String username,
     required String email,
     required String code,
     required String newPassword,
   }) async {
-    error = null; notifyListeners();
+    error = null;
+    notifyListeners();
     try {
       final uri = Uri.parse('$apiBase/api/auth/pw-reset/confirm');
       final res = await http
@@ -260,8 +310,9 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  // (토큰 방식 미사용 — 유지하고 싶으면 남겨두고, 아니면 삭제해도 됨)
-  Future<String?> verifyPwResetCode(String username, String email, String code) async {
+  // 토큰 기반 방식은 현재 사용 안 함 (필요시 구현)
+  Future<String?> verifyPwResetCode(
+      String username, String email, String code) async {
     return null;
   }
 

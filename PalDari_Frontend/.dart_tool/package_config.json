@@ -225,15 +225,15 @@
     },
     {
       "name": "path_provider_android",
-      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.2.18",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_android-2.2.20",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.9"
     },
     {
       "name": "path_provider_foundation",
-      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_foundation-2.4.2",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/path_provider_foundation-2.4.3",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.9"
     },
     {
       "name": "path_provider_linux",
@@ -290,6 +290,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "stomp_dart_client",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/stomp_dart_client-3.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "stream_channel",
       "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/stream_channel-2.1.4",
       "packageUri": "lib/",
@@ -327,15 +333,15 @@
     },
     {
       "name": "url_launcher_android",
-      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_android-6.3.23",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_android-6.3.24",
       "packageUri": "lib/",
       "languageVersion": "3.9"
     },
     {
       "name": "url_launcher_ios",
-      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_ios-6.3.4",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_ios-6.3.5",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.9"
     },
     {
       "name": "url_launcher_linux",
@@ -345,9 +351,9 @@
     },
     {
       "name": "url_launcher_macos",
-      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_macos-3.2.3",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/url_launcher_macos-3.2.4",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.9"
     },
     {
       "name": "url_launcher_platform_interface",
@@ -386,8 +392,14 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "web_socket",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/web_socket-1.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "win32",
-      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/win32-5.14.0",
+      "rootUri": "file:///C:/Users/hik55/AppData/Local/Pub/Cache/hosted/pub.dev/win32-5.15.0",
       "packageUri": "lib/",
       "languageVersion": "3.8"
     },

@@ -29,9 +29,11 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
-    public SecurityConfig(JwtTokenProvider jwtTokenProvider,
-                          CustomOAuth2UserService customOAuth2UserService,
-                          OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
+    public SecurityConfig(
+            JwtTokenProvider jwtTokenProvider,
+            CustomOAuth2UserService customOAuth2UserService,
+            OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler
+    ) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.customOAuth2UserService = customOAuth2UserService;
         this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
@@ -39,9 +41,11 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   UserDetailsService uds) throws Exception {
+                                                   UserDetailsService userDetailsService) throws Exception {
 
-        JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtTokenProvider, uds);
+        // ✅ 여기서 직접 생성: 순환참조 방지
+        JwtAuthenticationFilter jwtFilter =
+                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService);
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -50,33 +54,48 @@ public class SecurityConfig {
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (req, res, e) -> res.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .authorizeHttpRequests(reg -> reg
-                        .requestMatchers(HttpMethod.OPTIONS, "/api/**", "/oauth2/**", "/login/oauth2/**").permitAll()
-                        .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/verify").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/oauth2/**", "/login/oauth2/**", "/oauth-success").permitAll()
+                        // 인증 없이 허용
+                        .requestMatchers(
+                                "/",
+                                "/api/auth/signup",
+                                "/api/auth/login",
+                                "/api/auth/verify",
+                                "/api/auth/**",
+                                "/oauth2/**",
+                                "/login/oauth2/**",
+                                "/oauth-success"
+                        ).permitAll()
+                        // 게시글 조회는 공개
+                        .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
+                        // 글쓰기/수정/삭제는 인증 필요
+                        .requestMatchers("/api/posts/**").authenticated()
+                        // 채팅 API는 인증 필요
+                        .requestMatchers("/api/chat/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth -> oauth
-                        .userInfoEndpoint(u -> u.userService(customOAuth2UserService)) // DB 저장
-                        .successHandler(oAuth2LoginSuccessHandler)                   // JWT + Flutter redirect
+                        .userInfoEndpoint(u -> u.userService(customOAuth2UserService))
+                        .successHandler(oAuth2LoginSuccessHandler)
                         .failureHandler((req, res, ex) ->
                                 res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "OAuth2 login failed"))
                 )
                 .httpBasic(Customizer.withDefaults());
 
+        // ✅ 우리가 만든 jwtFilter 등록
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // CORS 정책
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "http://localhost:52736", // Flutter web dev 포트들 필요시 추가
+                "http://localhost:49816"
         ));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("Authorization","Content-Type","X-Requested-With"));

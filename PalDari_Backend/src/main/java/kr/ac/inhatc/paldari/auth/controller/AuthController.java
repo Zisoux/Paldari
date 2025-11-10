@@ -13,6 +13,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -85,7 +86,7 @@ public class AuthController {
             String jwt = userService.loginAndIssueToken(req.username(), req.password());
             return ResponseEntity.ok(Map.of("token", jwt));
         } catch (BadCredentialsException e) {
-            return ResponseEntity.status(401).body(Map.of("message", "Invalid credentials"));
+            return ResponseEntity.status(401).body(Map.of("message", "아이디 또는 비밀번호가 올바르지 않습니다."));
         } catch (IllegalStateException e) { // 이메일 미인증 등
             return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
         }
@@ -213,12 +214,24 @@ public class AuthController {
 
     /** 내 프로필 조회: JWT 필터가 넣어준 request attribute 사용 */
     @GetMapping("/me")
-    public ResponseEntity<?> me(@RequestAttribute(name = "username", required = false) String username) {
-        if (username == null) {
-            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
+    public ResponseEntity<?> me(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("message", "UNAUTHORIZED"));
         }
-        return ResponseEntity.ok(userService.getProfile(username));
+
+        String username = principal.getName();
+
+        var user = userService.getByUsername(username); // ⭐ 여기!
+
+        return ResponseEntity.ok(Map.of(
+                "username", user.getUsername(),
+                "email", user.getEmail(),
+                "role", user.getRole()
+        ));
     }
+
+
 
     /* ================== 내부 유틸 ================== */
 

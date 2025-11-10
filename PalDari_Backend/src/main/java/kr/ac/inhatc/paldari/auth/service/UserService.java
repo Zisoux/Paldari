@@ -8,7 +8,6 @@ import kr.ac.inhatc.paldari.auth.repository.UserRepository;
 import kr.ac.inhatc.paldari.auth.repository.VerificationTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -28,37 +27,27 @@ public class UserService implements UserDetailsService {
     private final MailService mailService;
     private final JwtTokenProvider jwtTokenProvider;
 
+    // ================= UserDetailsService 구현 =================
+
     @Override
-    public UserDetails loadUserByUsername(String username) {
-        return userRepository.findByUsername(username)
-                .map(u -> new org.springframework.security.core.userdetails.User(
-                        u.getUsername(),
-                        u.getPassword() == null ? "" : u.getPassword(),
-                        u.isEnabled(), true, true, true,
-                        List.of(new SimpleGrantedAuthority(u.getRole()))
-                ))
-                .orElseGet(() -> {
-                    // DB에 없으면 소셜 계정으로 새로 생성
-                    User newUser = new User(
-                            username,
-                            username, // 소셜로그인은 email이 username
-                            null,
-                            "GOOGLE",
-                            true,
-                            "ROLE_USER",
-                            LocalDateTime.now()
-                    );
-                    userRepository.save(newUser);
-                    return new org.springframework.security.core.userdetails.User(
-                            newUser.getUsername(),
-                            "",
-                            true, true, true, true,
-                            List.of(new SimpleGrantedAuthority(newUser.getRole()))
-                    );
-                });
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // username 기준으로 DB 조회 (LOCAL/GOOGLE 공통)
+        User u = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+        return new org.springframework.security.core.userdetails.User(
+                u.getUsername(),
+                // 소셜 로그인 유저는 password null일 수 있으므로 빈 문자열 처리
+                u.getPassword() == null ? "" : u.getPassword(),
+                u.isEnabled(), // enabled
+                true,          // accountNonExpired
+                true,          // credentialsNonExpired
+                true,          // accountNonLocked
+                List.of(new SimpleGrantedAuthority(u.getRole()))
+        );
     }
 
-
+    // ================= 회원가입 / 이메일 인증 =================
 
     @Transactional
     public void registerLocalUser(String username, String email, String rawPassword) {
@@ -69,20 +58,23 @@ public class UserService implements UserDetailsService {
             throw new IllegalArgumentException("Email already exists");
         }
 
-        // (username, email, password, provider, enabled, role, created)
         User user = new User(
                 username,
                 email,
                 passwordEncoder.encode(rawPassword),
                 "LOCAL",
-                false,
+                false,                 // 이메일 인증 전
                 "ROLE_USER",
                 LocalDateTime.now()
         );
         userRepository.save(user);
 
         String token = generateToken();
-        VerificationToken vt = new VerificationToken(token, user, LocalDateTime.now().plusHours(24));
+        VerificationToken vt = new VerificationToken(
+                token,
+                user,
+                LocalDateTime.now().plusHours(24)
+        );
         tokenRepository.save(vt);
 
         mailService.sendVerificationEmail(email, token);
@@ -106,23 +98,35 @@ public class UserService implements UserDetailsService {
         return true;
     }
 
-    /** AuthenticationManager 없이 직접 비밀번호 검증 */
+    // ================= 로그인 + JWT 발급 =================
+
+    /**
+     * AuthenticationManager 없이 직접 인증 후 JWT 발급
+     */
     public String loginAndIssueToken(String username, String rawPassword) {
         User u = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        // 로컬 계정만 비밀번호 로그인 가능 (소셜 전용 계정은 password가 null일 수 있음)
+        // 로컬 계정만 패스워드 로그인
         if (u.getPassword() == null || !passwordEncoder.matches(rawPassword, u.getPassword())) {
             throw new BadCredentialsException("Bad credentials");
         }
         if (!u.isEnabled()) {
             throw new IllegalStateException("Email not verified");
         }
+
         return jwtTokenProvider.generateToken(u.getUsername());
     }
 
+    // ================= 프로필 조회 =================
+
+    /**
+     * /api/auth/me 에서 사용할 사용자 프로필 맵
+     */
     public Map<String, Object> getProfile(String username) {
-        User u = userRepository.findByUsername(username).orElseThrow();
+        User u = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", u.getId());
         map.put("username", u.getUsername());
@@ -130,21 +134,19 @@ public class UserService implements UserDetailsService {
         map.put("provider", u.getProvider());
         map.put("enabled", u.isEnabled());
         map.put("role", u.getRole());
-        map.put("created", u.getCreated()); // 엔티티의 getter 이름에 맞춤
+        map.put("created", u.getCreated());
         return map;
     }
 
-    private String generateToken() {
-        byte[] bytes = new byte[24];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    /**
+     * /api/auth/me 등에서 도메인 User 자체가 필요할 때 사용
+     */
+    public User getByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
 
-    public String findUsername(String email) {
-        User u = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Email not found"));
-        return u.getUsername();
-    }
+    // ================= 기타 유틸/검색 =================
 
     public User findByEmail(String email) {
         return userRepository.findByEmail(email).orElse(null);
@@ -154,17 +156,10 @@ public class UserService implements UserDetailsService {
         return userRepository.findByUsernameAndEmail(username, email).orElse(null);
     }
 
-    /**
-     * 비밀번호 갱신
-     * @param username 사용자 ID
-     * @param email 이메일 (추가 확인용)
-     * @param encodedPassword 암호화된 비밀번호 (BCrypt 등)
-     */
     @Transactional
     public void updatePasswordByUsernameAndEmail(String username, String email, String encodedPassword) {
         User user = userRepository.findByUsernameAndEmail(username, email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보를 찾을 수 없습니다."));
-
         user.setPassword(encodedPassword);
         userRepository.save(user);
     }
@@ -173,9 +168,15 @@ public class UserService implements UserDetailsService {
     public void updatePasswordRaw(String username, String email, String rawPassword) {
         User user = userRepository.findByUsernameAndEmail(username, email)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 정보를 찾을 수 없습니다."));
-
         user.setPassword(passwordEncoder.encode(rawPassword));
         userRepository.save(user);
     }
 
+    // ================= 내부 토큰 생성 유틸 =================
+
+    private String generateToken() {
+        byte[] bytes = new byte[24];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
 }

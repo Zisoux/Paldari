@@ -13,13 +13,12 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
-    // application.yml에 설정: security.jwt.secret, security.jwt.validity-millis
     private final Key key;
     private final long validityMillis;
 
     public JwtTokenProvider(
             @Value("${security.jwt.secret:replace-this-with-a-very-long-secure-secret-key-please}") String secret,
-            @Value("${security.jwt.validity-millis:7200000}") long validityMillis // 기본 2시간
+            @Value("${security.jwt.validity-millis:7200000}") long validityMillis
     ) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.validityMillis = validityMillis;
@@ -39,6 +38,7 @@ public class JwtTokenProvider {
         return parseClaims(token).getBody().getSubject();
     }
 
+    /** 필터에서 쓸 토큰 유효성 체크 */
     public boolean validate(String token) {
         try {
             parseClaims(token);
@@ -49,6 +49,9 @@ public class JwtTokenProvider {
     }
 
     private Jws<Claims> parseClaims(String token) {
-        return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token);
     }
 }

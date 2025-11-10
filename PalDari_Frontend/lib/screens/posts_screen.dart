@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api.dart';
+import '../widgets/pal_bottom_nav.dart';
 import 'new_post_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -50,7 +51,6 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   Future<void> _onCreatePressed() async {
-    // 🔸 현재 선택된 국가/카테고리 값을 전달
     final created = await Navigator.of(context).push<int>(
       MaterialPageRoute(
         builder: (_) => NewPostScreen(
@@ -140,6 +140,9 @@ class _PostsScreenState extends State<PostsScreen> {
           ),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      bottomNavigationBar: const PalBottomNav(
+        currentIndex: 3, // ✅ 커뮤니티 탭 인덱스
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -257,12 +260,11 @@ class _PostsScreenState extends State<PostsScreen> {
                   final p = filteredPosts[i];
                   return GestureDetector(
                     onTap: () async {
-                      final result = await Navigator.of(context)
-                          .push(
+                      final result =
+                      await Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => PostDetailScreen(
-                            postId:
-                            (p['id'] as num).toInt(),
+                            postId: (p['id'] as num).toInt(),
                           ),
                         ),
                       );
@@ -299,11 +301,16 @@ class _PostsScreenState extends State<PostsScreen> {
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.redAccent),
-                                  onPressed: () => _deletePost(
-                                      (p['id'] as num)
-                                          .toInt()),
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color:
+                                    Colors.redAccent,
+                                  ),
+                                  onPressed: () =>
+                                      _deletePost(
+                                        (p['id'] as num)
+                                            .toInt(),
+                                      ),
                                 ),
                               ],
                             ),
@@ -311,7 +318,8 @@ class _PostsScreenState extends State<PostsScreen> {
                             Text(
                               p['content'] ?? '',
                               maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              overflow:
+                              TextOverflow.ellipsis,
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.black87,

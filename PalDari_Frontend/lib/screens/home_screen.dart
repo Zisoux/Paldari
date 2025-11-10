@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/pal_bottom_nav.dart';
 
 /// PalDari Home Screen
 
@@ -34,7 +35,8 @@ class PalHomeScreen extends StatelessWidget {
         top: false,
         child: _PalListSection(),
       ),
-      bottomNavigationBar: const _PalBottomNav(currentIndex: 0),
+      // ✅ 현재 탭 index = 0 (홈)
+      bottomNavigationBar: const PalBottomNav(currentIndex: 0),
     );
   }
 }
@@ -91,14 +93,16 @@ class _PalTopAppBar extends StatelessWidget {
               padding: const EdgeInsets.only(left: 8.0),
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: PalColors.orange.withOpacity(0.6)),
+                  border:
+                  Border.all(color: PalColors.orange.withOpacity(0.6)),
                 ),
                 child: Text(
-                  "환영합니다, '" + username! + "'님",
+                  "환영합니다, '$username'님",
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.black87,
@@ -119,12 +123,11 @@ class _PalListSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pals = _mockPals; // Replace with your actual data source.
+    final pals = _mockPals; // TODO: 실제 데이터 연동
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
       children: [
-        // Section Header
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 8.0),
           child: Text(
@@ -137,12 +140,12 @@ class _PalListSection extends StatelessWidget {
             ),
           ),
         ),
-
-        // Cards
-        ...pals.map((p) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: PalCard(pal: p),
-        )),
+        ...pals.map(
+              (p) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: PalCard(pal: p),
+          ),
+        ),
       ],
     );
   }
@@ -158,7 +161,8 @@ class PalCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
-        // TODO: navigate to Pal detail or chat
+        // TODO: 여기서 Pal 상세 or 채팅방으로 이동
+        // 예: Navigator.pushNamed(context, '/chats');
       },
       child: Ink(
         decoration: BoxDecoration(
@@ -171,7 +175,6 @@ class PalCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar
               CircleAvatar(
                 radius: 30,
                 backgroundColor: PalColors.orangeSolid,
@@ -186,8 +189,6 @@ class PalCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-
-              // Name, Country, Tags
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,11 +210,11 @@ class PalCard extends StatelessWidget {
                         ),
                         if (pal.online)
                           Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDDF6E3),
-                              borderRadius: BorderRadius.circular(4),
+                            width: 10,
+                            height: 10,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
                             ),
                           ),
                       ],
@@ -232,7 +233,8 @@ class PalCard extends StatelessWidget {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: pal.tags.map(_TagChip.new).toList(),
+                      children:
+                      pal.tags.map((t) => _TagChip(t)).toList(),
                     ),
                   ],
                 ),
@@ -252,7 +254,8 @@ class _TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
         color: PalColors.tagRedBg,
         borderRadius: BorderRadius.circular(100),
@@ -270,31 +273,6 @@ class _TagChip extends StatelessWidget {
   }
 }
 
-class _PalBottomNav extends StatelessWidget {
-  const _PalBottomNav({required this.currentIndex});
-  final int currentIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationBar(
-      selectedIndex: currentIndex,
-      backgroundColor: Colors.white,
-      elevation: 1,
-      indicatorColor: PalColors.orange.withOpacity(0.15),
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '홈'),
-        NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: '매칭'),
-        NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: '채팅'),
-        NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: '커뮤니티'),
-        NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: '마이페이지'),
-      ],
-      onDestinationSelected: (i) {
-        // TODO: wire navigation or use go_router
-      },
-    );
-  }
-}
-
 // ------------------ Mock Data & Model ------------------
 class Pal {
   final String name;
@@ -302,7 +280,12 @@ class Pal {
   final List<String> tags;
   final bool online;
 
-  Pal({required this.name, required this.country, required this.tags, this.online = false});
+  Pal({
+    required this.name,
+    required this.country,
+    required this.tags,
+    this.online = false,
+  });
 
   String get initial => name.isNotEmpty ? name.characters.first : '?';
 }

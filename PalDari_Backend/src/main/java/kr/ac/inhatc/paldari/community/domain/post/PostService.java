@@ -1,5 +1,8 @@
 package kr.ac.inhatc.paldari.community.domain.post;
 
+import jakarta.transaction.Transactional;
+import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
+import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
@@ -7,13 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-
-import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
-import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -22,61 +21,97 @@ public class PostService {
 
     private final PostRepository repo;
 
-    // ✅ 최신순 목록
-    @Transactional(readOnly = true)
+    @Transactional(Transactional.TxType.SUPPORTS)
     public List<PostResponse> listAll() {
         return repo.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
                 .stream()
-                .map(p -> new PostResponse(
-                        p.getId(), p.getMemberId(), p.getTitle(), p.getContent(), p.getCreatedAt()
-                ))
+                .map(this::toDto)
                 .toList();
     }
 
-    // ✅ (선택) 페이징 버전
-    @Transactional(readOnly = true)
+    @Transactional(Transactional.TxType.SUPPORTS)
     public Page<PostResponse> list(Pageable pageable) {
         return repo.findAll(pageable)
-                .map(p -> new PostResponse(
-                        p.getId(), p.getMemberId(), p.getTitle(), p.getContent(), p.getCreatedAt()
-                ));
+                .map(this::toDto);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(Transactional.TxType.SUPPORTS)
     public PostResponse get(Long id) {
         var p = repo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
-        return new PostResponse(
-                p.getId(), p.getMemberId(), p.getTitle(), p.getContent(), p.getCreatedAt()
-        );
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
+        return toDto(p);
     }
 
-    public PostResponse create(PostRequest req) {
-        // (권장) Controller에서 @Valid로 title/content null/blank 검증
-        Post saved = repo.save(new Post(req.getMemberId(), req.getTitle(), req.getContent()));
-        return new PostResponse(
-                saved.getId(), saved.getMemberId(), saved.getTitle(), saved.getContent(), saved.getCreatedAt()
-        );
+    // 생성: Principal(username) 사용
+    public PostResponse create(PostRequest req, String username) {
+        if (username == null || username.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 필요");
+        }
+
+        Post saved = repo.save(new Post(
+                username,
+                req.getTitle(),
+                req.getContent(),
+                req.getCountry(),
+                req.getCategory()
+        ));
+
+        return toDto(saved);
     }
 
-    public PostResponse update(Long id, PostRequest req) {
+    // 수정: 작성자만 가능
+    public PostResponse update(Long id, PostRequest req, String username) {
+        if (username == null || username.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 필요");
+        }
+
         var p = repo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
+
+        if (!username.equals(p.getAuthorUsername())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "수정 권한이 없습니다.");
+        }
+
         p.setTitle(req.getTitle());
         p.setContent(req.getContent());
-        // JPA 더티체킹으로 자동 flush; @PreUpdate가 updatedAt 세팅
+        p.setCountry(req.getCountry());
+        p.setCategory(req.getCategory());
 
-        return new PostResponse(
-                p.getId(), p.getMemberId(), p.getTitle(), p.getContent(), p.getCreatedAt()
-        );
+        return toDto(p);
     }
 
-    public void delete(Long id) {
+    // 삭제: 작성자만 가능
+    public void delete(Long id, String username) {
+        if (username == null || username.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 필요");
+        }
+
+        var p = repo.findById(id)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
+
+        if (!username.equals(p.getAuthorUsername())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "삭제 권한이 없습니다.");
+        }
+
         try {
-            repo.deleteById(id); // ✅ 단일 쿼리
+            repo.delete(p);
         } catch (EmptyResultDataAccessException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id);
         }
-        // (선택) 캐시 사용 시: @CacheEvict(value="posts", allEntries=true)
+    }
+
+    private PostResponse toDto(Post p) {
+        return new PostResponse(
+                p.getId(),
+                p.getAuthorUsername(),
+                p.getTitle(),
+                p.getContent(),
+                p.getCountry(),
+                p.getCategory(),
+                p.getCreatedAt() != null ? p.getCreatedAt().toString() : null
+        );
     }
 }

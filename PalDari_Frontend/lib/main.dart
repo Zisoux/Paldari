@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:paldari/screens/chat_list_screen.dart';
 import 'package:paldari/screens/find_email_screen.dart';
 import 'package:paldari/screens/find_pw_screen.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,7 @@ import 'screens/home_screen.dart';
 import 'screens/oauth_success_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
-import 'screens/posts_screen.dart'; // 파일 경로가 lib/screens/posts_screen.dart 여야 함
+import 'screens/posts_screen.dart';
 
 void main() {
   if (kIsWeb) {
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => AuthState(auth),
       child: MaterialApp(
-        title: 'Paldari Auth',
+        title: 'Paldari',
         initialRoute: '/',
 
         // query parameter 포함 라우트 처리
@@ -62,12 +63,12 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const PalHomeScreen());
             case '/posts':
               return MaterialPageRoute(builder: (_) => const PostsScreen());
+            case '/chats':
+              return MaterialPageRoute(builder: (_) => const ChatListScreen());
             default:
               return MaterialPageRoute(builder: (_) => const LoginScreen());
           }
         },
-
-        // 기존 routes 제거 (onGenerateRoute로 통합)
       ),
     );
   }
