@@ -1,6 +1,7 @@
 package kr.ac.inhatc.paldari.chats.controller;
 
 import kr.ac.inhatc.paldari.chats.entity.ChatMessage;
+import kr.ac.inhatc.paldari.chats.entity.ChatRoom;
 import kr.ac.inhatc.paldari.chats.repository.ChatMessageRepository;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomRepository;
 import lombok.AllArgsConstructor;
@@ -21,33 +22,41 @@ public class ChatController {
     private final ChatMessageRepository chatMessageRepository;
 
     /**
-     * 현재 유저의 채팅방 목록 조회 (예시)
+     * 개발용: 모든 유저에게 공통 "개발자 테스트 방" 하나를 항상 반환.
      * Flutter: GET /api/chat/rooms
      */
     @GetMapping("/rooms")
     public List<ChatRoomResponse> getMyRooms(Principal principal) {
-        String username = principal.getName();
+        // 일단 인증은 SecurityConfig에서 처리된다고 가정.
+        // principal.getName() 쓰면 "누가 접속했는지" 확인 가능 (로그용).
 
-        // TODO: 실제 비즈니스 로직으로 교체
-        // 여기서는 "해당 유저가 속한 방" 필터링이 있다고 가정하고,
-        // 일단 전체 방을 반환하는 샘플로 둔다.
-        return chatRoomRepository.findAll().stream()
-                .map(room -> new ChatRoomResponse(
-                        room.getId(),
-                        room.getName()
-                ))
-                .collect(Collectors.toList());
+        // 1. DEV_TEST_ROOM 이라는 내부용 채팅방이 없으면 생성
+        ChatRoom devRoom = chatRoomRepository.findByName("DEV_TEST_ROOM")
+                .orElseGet(() -> {
+                    ChatRoom room = new ChatRoom();
+                    room.setName("DEV_TEST_ROOM");
+                    return chatRoomRepository.save(room);
+                });
+
+        // 2. 프론트에는 보기 좋게 label만 바꿔서 전달
+        return List.of(
+                new ChatRoomResponse(devRoom.getId(), "개발자 테스트 방")
+        );
     }
 
     /**
-     * 특정 채팅방 메시지 목록 조회 (옵션)
+     * 특정 채팅방 메시지 목록 조회
      * Flutter: GET /api/chat/rooms/{roomId}/messages
      */
     @GetMapping("/rooms/{roomId}/messages")
     public List<ChatMessageResponse> getMessages(@PathVariable Long roomId,
                                                  Principal principal) {
-        // 필요하면 room 접근 권한 체크
-        List<ChatMessage> messages = chatMessageRepository.findByRoom_IdOrderBySentAtAsc(roomId);
+
+        // TODO: 필요하다면 여기서 room 접근 권한 체크
+
+        // 네가 만든 메서드 이름에 맞춰 사용 (findByRoomIdOrderBySentAtAsc)
+        List<ChatMessage> messages =
+                chatMessageRepository.findByRoomIdOrderBySentAtAsc(roomId);
 
         return messages.stream()
                 .map(m -> new ChatMessageResponse(

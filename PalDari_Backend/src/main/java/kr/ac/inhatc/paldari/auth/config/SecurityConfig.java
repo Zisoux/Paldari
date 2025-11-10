@@ -43,7 +43,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    UserDetailsService userDetailsService) throws Exception {
 
-        // ✅ 여기서 직접 생성: 순환참조 방지
+        // 여기서 직접 생성: 순환참조 방지
         JwtAuthenticationFilter jwtFilter =
                 new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService);
 
@@ -65,6 +65,8 @@ public class SecurityConfig {
                                 "/login/oauth2/**",
                                 "/oauth-success"
                         ).permitAll()
+                        // websocket + SockJS 허용
+                        .requestMatchers("/ws-chat/**").permitAll()
                         // 게시글 조회는 공개
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         // 글쓰기/수정/삭제는 인증 필요
@@ -81,7 +83,7 @@ public class SecurityConfig {
                 )
                 .httpBasic(Customizer.withDefaults());
 
-        // ✅ 우리가 만든 jwtFilter 등록
+        // 우리가 만든 jwtFilter 등록
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
