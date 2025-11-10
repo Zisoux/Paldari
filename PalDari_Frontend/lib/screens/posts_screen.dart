@@ -327,7 +327,7 @@ class _PostsScreenState extends State<PostsScreen> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              '${p['country'] ?? '국가 미지정'} · ${p['category'] ?? '카테고리 없음'}\n작성자: ${p['memberId'] ?? '-'} · ${p['createdAt'] ?? ''}',
+                              '${p['country'] ?? '국가 미지정'} · ${p['category'] ?? '카테고리 없음'}\n작성자: ${p['authorUsername'] ?? '-'} · ${p['createdAt'] ?? ''}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,

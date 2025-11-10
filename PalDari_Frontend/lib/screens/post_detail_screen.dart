@@ -244,7 +244,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 const SizedBox(height: 8),
                 Text(post!['content'] ?? ''),
                 const SizedBox(height: 8),
-                Text('작성자: ${post!['memberId'] ?? '-'} · ${post!['createdAt'] ?? ''}', style: const TextStyle(fontSize: 12)),
+                Text('작성자: ${post!['authorUsername'] ?? '-'} · ${post!['createdAt'] ?? ''}', style: const TextStyle(fontSize: 12)),
               ],
             ),
           ),
