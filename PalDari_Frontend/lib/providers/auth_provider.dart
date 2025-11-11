@@ -1,17 +1,17 @@
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../config.dart';                // apiBase
+import '../config.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/secure_storage.dart';
 
-/// /api/auth/findEmail 응답 해석 결과
 class FindEmailResult {
-  final bool exists;        // 가입된 이메일인지
-  final String? username;   // 서버에서 받은 아이디(또는 메시지에서 파싱)
-  final String message;     // 서버 메시지 (UI에 그대로 표출 가능)
+  final bool exists;
+  final String? username;
+  final String message;
 
   FindEmailResult({
     required this.exists,
@@ -22,51 +22,71 @@ class FindEmailResult {
 
 class AuthState with ChangeNotifier {
   final SecureStorage _storage = SecureStorage();
+  late final ApiClient _api;
   late final AuthService _auth;
 
   bool loading = false;
-  Map<String, dynamic>? profile;
   String? error;
 
-  String? _accessToken; // STOMP, API 등에서 쓸 현재 액세스 토큰
+  String? _accessToken;
   String? _refreshToken;
+  Map<String, dynamic>? profile;
 
+  // ===== 환경설정 값 =====
+  bool allowNotification = true;
+  bool allowMatching = true;
+  bool realtimeTranslation = false;
+
+  // ===== 태그 / 지역 =====
+  List<String>? _tags;
+  List<String>? _regions;
+
+  List<String> get tags => _tags ?? const <String>[];
+  List<String> get regions => _regions ?? const <String>[];
+
+  // ===== 생성자 =====
   AuthState() {
-    _auth = AuthService(ApiClient(), _storage);
+    _api = ApiClient();
+    _auth = AuthService(_api, _storage);
     _init();
   }
 
-  // ====== getters ======
+  // ===== 공용 getter =====
 
-  bool get isLoggedIn => _accessToken != null;
+  bool get isLoggedIn =>
+      _accessToken != null && _accessToken!.isNotEmpty;
 
   String? get accessToken => _accessToken;
-
   String? get refreshToken => _refreshToken;
 
-  /// 현재 로그인한 유저 아이디 (백엔드 /api/auth/me 응답 기준)
   String? get username {
     final name = profile?['username'] as String?;
     if (name == null) return null;
-    final trimmed = name.trim();
-    return trimmed.isEmpty ? null : trimmed;
+    final t = name.trim();
+    return t.isEmpty ? null : t;
   }
 
-  // ====== 초기화 ======
+  // ===== 초기화 =====
 
   Future<void> _init() async {
     _accessToken = await _storage.readAccessToken();
     _refreshToken = await _storage.readRefreshToken();
 
-    // 이미 토큰이 있으면 프로필 한번 조용히 시도
-    if (_accessToken != null) {
+    if (isLoggedIn) {
       await _loadProfileSilently();
+
+      // me()에서 401 이었으면 여기서 isLoggedIn=false 가 되어 있음
+      if (isLoggedIn) {
+        await reloadSettings(silent: true);
+        await reloadTags(silent: true);
+        await reloadRegions(silent: true);
+      }
     }
 
     notifyListeners();
   }
 
-  // ====== 내부 유틸 ======
+  // ===== 내부 유틸 =====
 
   String _extractMsg(String body) {
     try {
@@ -79,15 +99,13 @@ class AuthState with ChangeNotifier {
   }
 
   String? _parseUsernameFromMessage(String msg) {
-    // 예: "가입된 이메일입니다. (아이디: myUser )"
     const key = '아이디';
     final idxKey = msg.indexOf(key);
     if (idxKey < 0) return null;
-
     final idxColon = msg.indexOf(':', idxKey);
     if (idxColon < 0) return null;
-
     final idxClose = msg.indexOf(')', idxColon + 1);
+
     final raw = (idxClose > idxColon)
         ? msg.substring(idxColon + 1, idxClose)
         : msg.substring(idxColon + 1);
@@ -96,19 +114,46 @@ class AuthState with ChangeNotifier {
     return u.isEmpty ? null : u;
   }
 
+  Future<void> _clearAuthSilently() async {
+    await _storage.deleteTokens();
+    _accessToken = null;
+    _refreshToken = null;
+    profile = null;
+    _tags = const <String>[];
+    _regions = const <String>[];
+    // 환경 설정은 디폴트로 초기화
+    allowNotification = true;
+    allowMatching = true;
+    realtimeTranslation = false;
+  }
+
   Future<void> _loadProfileSilently() async {
     try {
-      final me = await _auth.me();
-      profile = me;
+      final p = await _auth.me();
+      if (kDebugMode) {
+        print('me() = $p');
+      }
+      profile = p;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode;
+      if (status == 401) {
+        if (kDebugMode) {
+          print('silent me() 401 -> clear tokens');
+        }
+        await _clearAuthSilently();
+      } else {
+        if (kDebugMode) {
+          print('loadProfile silently failed: $e');
+        }
+      }
     } catch (e) {
       if (kDebugMode) {
         print('loadProfile silently failed: $e');
       }
-      // 여기서는 error 안 건드림
     }
   }
 
-  // ====== 회원가입 / 로그인 / 로그아웃 ======
+  // ===== 회원가입 / 로그인 / 로그아웃 =====
 
   Future<void> signup(String u, String e, String p) async {
     loading = true;
@@ -124,14 +169,10 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  /// 일반 로그인
-  /// - 성공 시 AuthService가 access/refresh를 SecureStorage에 저장
-  /// - 여기서는 메모리 캐시 + 프로필 동기화
   Future<bool> login(String u, String p) async {
     loading = true;
     error = null;
     notifyListeners();
-
     try {
       await _auth.login(username: u, password: p);
 
@@ -139,6 +180,12 @@ class AuthState with ChangeNotifier {
       _refreshToken = await _storage.readRefreshToken();
 
       await _loadProfileSilently();
+
+      if (isLoggedIn) {
+        await reloadSettings(silent: true);
+        await reloadTags(silent: true);
+        await reloadRegions(silent: true);
+      }
 
       return true;
     } catch (e) {
@@ -150,14 +197,12 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  /// /api/auth/me를 강제로 다시 불러와 UI 갱신하고 싶을 때
   Future<void> loadProfile() async {
     loading = true;
     error = null;
     notifyListeners();
     try {
-      final me = await _auth.me();
-      profile = me;
+      profile = await _auth.me();
     } catch (e) {
       error = e.toString();
     } finally {
@@ -166,8 +211,6 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  /// OAuth 콜백 등에서 access/refresh를 바로 받는 경우
-  /// - OAuthSuccessScreen에서 호출
   Future<void> setTokensFromCallback({
     required String accessToken,
     String? refreshToken,
@@ -176,25 +219,28 @@ class AuthState with ChangeNotifier {
       accessToken: accessToken,
       refreshToken: refreshToken,
     );
-
     _accessToken = accessToken;
     _refreshToken = refreshToken;
 
     await _loadProfileSilently();
+    if (isLoggedIn) {
+      await reloadSettings(silent: true);
+      await reloadTags(silent: true);
+      await reloadRegions(silent: true);
+    }
+
     notifyListeners();
   }
 
   Future<void> logout() async {
-    await _auth.logout(); // 내부에서 SecureStorage 삭제 처리
-    profile = null;
-    _accessToken = null;
-    _refreshToken = null;
-    error = null;
+    await _auth.logout();
+    await _clearAuthSilently();
     loading = false;
+    error = null;
     notifyListeners();
   }
 
-  // ====== 아이디 찾기 (이메일 기반) ======
+  // ===== 아이디 찾기 =====
 
   Future<FindEmailResult> checkEmailAndFetchUsername(String email) async {
     error = null;
@@ -209,7 +255,6 @@ class AuthState with ChangeNotifier {
           .timeout(const Duration(seconds: 10));
 
       final msg = _extractMsg(res.body);
-
       bool exists = false;
       String? username;
 
@@ -232,8 +277,6 @@ class AuthState with ChangeNotifier {
           exists = true;
           username = _parseUsernameFromMessage(msg);
         } else if (msg.contains('등록되지 않은 이메일')) {
-          exists = false;
-        } else {
           exists = false;
         }
       }
@@ -270,7 +313,7 @@ class AuthState with ChangeNotifier {
     return res.exists;
   }
 
-  // ====== 비밀번호 재설정 (기존 HTTP 방식 유지) ======
+  // ===== 비번 재설정 (HTTP) =====
 
   Future<bool> requestPwResetCode(String username, String email) async {
     error = null;
@@ -339,16 +382,268 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  // 토큰 기반 방식은 현재 사용 안 함 (필요시 구현)
+  // 필요 없으면 지워도 되는 placeholder
   Future<String?> verifyPwResetCode(
-      String username, String email, String code) async {
-    return null;
-  }
+      String username, String email, String code) async =>
+      null;
 
   Future<bool> resetPasswordWithToken({
     required String resetToken,
     required String newPassword,
+  }) async =>
+      false;
+
+  // ===== 회원탈퇴 =====
+
+  Future<bool> withdrawAccount() async {
+    try {
+      final token = _accessToken;
+      if (token == null || token.isEmpty) {
+        error = '로그인 정보가 없습니다.';
+        notifyListeners();
+        return false;
+      }
+
+      final res = await http.delete(
+        Uri.parse('$apiBase/api/auth/withdraw'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (res.statusCode == 200) {
+        await logout();
+        return true;
+      } else {
+        try {
+          final body = jsonDecode(res.body);
+          error = (body['message'] ?? '회원탈퇴 실패').toString();
+        } catch (_) {
+          error = '회원탈퇴 실패: ${res.body}';
+        }
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      error = '회원탈퇴 오류: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ===== Settings (/api/profile/settings) =====
+
+  Future<void> reloadSettings({bool silent = false}) async {
+    if (!isLoggedIn) {
+      if (!silent) notifyListeners();
+      return;
+    }
+    try {
+      final res = await _api.dio.get('/api/profile/settings');
+      final data = res.data;
+      if (data is Map<String, dynamic>) {
+        allowNotification =
+            (data['allowNotification'] as bool?) ?? allowNotification;
+        allowMatching =
+            (data['allowMatching'] as bool?) ?? allowMatching;
+        realtimeTranslation =
+            (data['realtimeTranslation'] as bool?) ??
+                realtimeTranslation;
+      }
+      if (!silent) notifyListeners();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        if (kDebugMode && !silent) {
+          print('reloadSettings unauthorized (ignored)');
+        }
+      } else {
+        debugPrint('reloadSettings failed: $e');
+      }
+      if (!silent) notifyListeners();
+    } catch (e) {
+      debugPrint('reloadSettings failed: $e');
+      if (!silent) notifyListeners();
+    }
+  }
+
+  Future<void> updateSettings({
+    bool? allowNotification,
+    bool? allowMatching,
+    bool? realtimeTranslation,
   }) async {
-    return false;
+    if (!isLoggedIn) return;
+    try {
+      final payload = <String, dynamic>{};
+      if (allowNotification != null) {
+        payload['allowNotification'] = allowNotification;
+      }
+      if (allowMatching != null) {
+        payload['allowMatching'] = allowMatching;
+      }
+      if (realtimeTranslation != null) {
+        payload['realtimeTranslation'] = realtimeTranslation;
+      }
+      if (payload.isEmpty) return;
+
+      final res =
+      await _api.dio.patch('/api/profile/settings', data: payload);
+      final data = res.data;
+      if (data is Map<String, dynamic>) {
+        this.allowNotification =
+            (data['allowNotification'] as bool?) ??
+                this.allowNotification;
+        this.allowMatching =
+            (data['allowMatching'] as bool?) ??
+                this.allowMatching;
+        this.realtimeTranslation =
+            (data['realtimeTranslation'] as bool?) ??
+                this.realtimeTranslation;
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('updateSettings failed: $e');
+    }
+  }
+
+  // ===== Tags =====
+
+  Future<void> reloadTags({bool silent = false}) async {
+    if (!isLoggedIn) {
+      _tags = const <String>[];
+      if (!silent) notifyListeners();
+      return;
+    }
+    try {
+      final res = await _api.dio.get('/api/profile/tags');
+      final data = res.data;
+      if (data is Map && data['items'] is List) {
+        _tags = List<String>.from(data['items'] as List);
+      } else if (data is List) {
+        _tags = List<String>.from(data);
+      } else {
+        _tags = const <String>[];
+      }
+      if (!silent) notifyListeners();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        if (kDebugMode && !silent) {
+          print('reloadTags unauthorized (ignored)');
+        }
+      } else {
+        debugPrint('reloadTags failed: $e');
+      }
+      _tags = _tags ?? const <String>[];
+      if (!silent) notifyListeners();
+    } catch (e) {
+      debugPrint('reloadTags failed: $e');
+      _tags = _tags ?? const <String>[];
+      if (!silent) notifyListeners();
+    }
+  }
+
+  Future<void> addTag(String tag) async {
+    if (!isLoggedIn) return;
+    final t = tag.trim();
+    if (t.isEmpty) return;
+    try {
+      final res = await _api.dio.post(
+        '/api/profile/tags',
+        data: {'tag': t},
+      );
+      final data = res.data;
+      if (data is Map && data['items'] is List) {
+        _tags = List<String>.from(data['items'] as List);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('addTag failed: $e');
+    }
+  }
+
+  Future<void> removeTag(String tag) async {
+    if (!isLoggedIn) return;
+    try {
+      final res = await _api.dio.delete(
+        '/api/profile/tags',
+        data: {'tag': tag},
+      );
+      final data = res.data;
+      if (data is Map && data['items'] is List) {
+        _tags = List<String>.from(data['items'] as List);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('removeTag failed: $e');
+    }
+  }
+
+  // ===== Regions =====
+
+  Future<void> reloadRegions({bool silent = false}) async {
+    if (!isLoggedIn) {
+      _regions = const <String>[];
+      if (!silent) notifyListeners();
+      return;
+    }
+    try {
+      final res = await _api.dio.get('/api/profile/regions');
+      final data = res.data;
+      if (data is Map && data['items'] is List) {
+        _regions = List<String>.from(data['items'] as List);
+      } else if (data is List) {
+        _regions = List<String>.from(data);
+      } else {
+        _regions = const <String>[];
+      }
+      if (!silent) notifyListeners();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        if (kDebugMode && !silent) {
+          print('reloadRegions unauthorized (ignored)');
+        }
+      } else {
+        debugPrint('reloadRegions failed: $e');
+      }
+      _regions = _regions ?? const <String>[];
+      if (!silent) notifyListeners();
+    } catch (e) {
+      debugPrint('reloadRegions failed: $e');
+      _regions = _regions ?? const <String>[];
+      if (!silent) notifyListeners();
+    }
+  }
+
+  Future<void> addRegion(String region) async {
+    if (!isLoggedIn) return;
+    final r = region.trim();
+    if (r.isEmpty) return;
+    try {
+      final res = await _api.dio.post(
+        '/api/profile/regions',
+        data: {'region': r},
+      );
+      final data = res.data;
+      if (data is Map && data['items'] is List) {
+        _regions = List<String>.from(data['items'] as List);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('addRegion failed: $e');
+    }
+  }
+
+  Future<void> removeRegion(String region) async {
+    if (!isLoggedIn) return;
+    try {
+      final res = await _api.dio.delete(
+        '/api/profile/regions',
+        data: {'region': region},
+      );
+      final data = res.data;
+      if (data is Map && data['items'] is List) {
+        _regions = List<String>.from(data['items'] as List);
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('removeRegion failed: $e');
+    }
   }
 }

@@ -10,7 +10,8 @@ class AuthService {
 
   Dio get _dio => _api.dio;
 
-  /// 회원가입
+  // ================= 회원가입 =================
+
   Future<void> signup({
     required String username,
     required String email,
@@ -37,9 +38,10 @@ class AuthService {
     }
   }
 
-  /// 로그인
-  /// - 성공 시 accessToken / refreshToken 을 SecureStorage에 저장
-  /// - 실패 시 사람이 읽을 수 있는 문자열 throw
+  // ================= 로그인 (access + refresh 저장) =================
+
+  /// 성공 시 accessToken / refreshToken 을 SecureStorage에 저장
+  /// 실패 시 사람이 읽을 수 있는 메시지 throw
   Future<void> login({
     required String username,
     required String password,
@@ -89,7 +91,31 @@ class AuthService {
     }
   }
 
-  /// 현재 유저 정보 (/api/auth/me)
+  // ================= 토큰/프로필 =================
+
+  /// 현재 저장된 Access Token
+  Future<String?> getAccessToken() async {
+    return _storage.readAccessToken();
+  }
+
+  /// 현재 저장된 Refresh Token
+  Future<String?> getRefreshToken() async {
+    return _storage.readRefreshToken();
+  }
+
+  /// OAuth2 성공 리다이렉트에서 받은 토큰 저장용
+  /// - /oauth-success?access=...&refresh=... 이런 식으로 받는 것을 상정
+  Future<void> saveTokenFromCallback({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
+    await _storage.saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
+  }
+
+  /// /api/auth/me
   Future<Map<String, dynamic>> me() async {
     try {
       final res = await _dio.get('/api/auth/me');
@@ -107,13 +133,14 @@ class AuthService {
     }
   }
 
-  /// 로그아웃
-  /// - 서버에 별도 호출 없이, 로컬 토큰만 제거
+  // ================= 로그아웃 =================
+
+  /// 서버 호출 없이 로컬 토큰만 제거
   Future<void> logout() async {
     await _storage.deleteTokens();
   }
 
-  // ====== 내부 유틸 ======
+  // ================= 내부 유틸 =================
 
   String? _readErrorMessage(DioException e) {
     final data = e.response?.data;
@@ -127,4 +154,122 @@ class AuthService {
     }
     return null;
   }
+
+  /// 내 환경설정 조회
+  Future<Map<String, dynamic>> getSettings() async {
+    try {
+      final res = await _dio.get('/api/user/settings');
+      if (res.statusCode == 200 && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      throw '설정 조회 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '설정 조회 실패';
+    }
+  }
+
+  /// 환경설정 업데이트 (부분 업데이트 가능)
+  Future<Map<String, dynamic>> updateSettings({
+    bool? allowNotification,
+    bool? allowMatching,
+    bool? realtimeTranslation,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (allowNotification != null) body['allowNotification'] = allowNotification;
+      if (allowMatching != null) body['allowMatching'] = allowMatching;
+      if (realtimeTranslation != null) body['realtimeTranslation'] = realtimeTranslation;
+
+      final res = await _dio.patch('/api/user/settings', data: body);
+      if (res.statusCode == 200 && res.data is Map) {
+        return Map<String, dynamic>.from(res.data as Map);
+      }
+      throw '설정 변경 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '설정 변경 실패';
+    }
+  }
+
+  // ===== Tags =====
+
+  Future<List<String>> getTags() async {
+    try {
+      final res = await _dio.get('/api/user/tags');
+      if (res.statusCode == 200 && res.data is Map) {
+        final items = (res.data['items'] as List?) ?? [];
+        return items.map((e) => e.toString()).toList();
+      }
+      throw '태그 조회 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '태그 조회 실패';
+    }
+  }
+
+  Future<List<String>> addTag(String tag) async {
+    try {
+      final res = await _dio.post('/api/user/tags', data: {'tag': tag});
+      if (res.statusCode == 200 && res.data is Map) {
+        final items = (res.data['items'] as List?) ?? [];
+        return items.map((e) => e.toString()).toList();
+      }
+      throw '태그 추가 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '태그 추가 실패';
+    }
+  }
+
+  Future<List<String>> removeTag(String tag) async {
+    try {
+      final res = await _dio.delete('/api/user/tags', data: {'tag': tag});
+      if (res.statusCode == 200 && res.data is Map) {
+        final items = (res.data['items'] as List?) ?? [];
+        return items.map((e) => e.toString()).toList();
+      }
+      throw '태그 삭제 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '태그 삭제 실패';
+    }
+  }
+
+  // ===== Regions =====
+
+  Future<List<String>> getRegions() async {
+    try {
+      final res = await _dio.get('/api/user/regions');
+      if (res.statusCode == 200 && res.data is Map) {
+        final items = (res.data['items'] as List?) ?? [];
+        return items.map((e) => e.toString()).toList();
+      }
+      throw '지역 조회 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '지역 조회 실패';
+    }
+  }
+
+  Future<List<String>> addRegion(String region) async {
+    try {
+      final res = await _dio.post('/api/user/regions', data: {'region': region});
+      if (res.statusCode == 200 && res.data is Map) {
+        final items = (res.data['items'] as List?) ?? [];
+        return items.map((e) => e.toString()).toList();
+      }
+      throw '지역 추가 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '지역 추가 실패';
+    }
+  }
+
+  Future<List<String>> removeRegion(String region) async {
+    try {
+      final res = await _dio.delete('/api/user/regions', data: {'region': region});
+      if (res.statusCode == 200 && res.data is Map) {
+        final items = (res.data['items'] as List?) ?? [];
+        return items.map((e) => e.toString()).toList();
+      }
+      throw '지역 삭제 실패 (${res.statusCode})';
+    } on DioException catch (e) {
+      throw _readErrorMessage(e) ?? '지역 삭제 실패';
+    }
+  }
+
 }

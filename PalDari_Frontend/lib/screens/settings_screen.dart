@@ -18,8 +18,17 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
+
     final username = (auth.profile?['username'] as String?) ?? '';
     final email = (auth.profile?['email'] as String?) ?? '';
+    final rawEnabled = auth.profile?['enabled'];
+    final enabled =
+        rawEnabled == true || rawEnabled == 1 || rawEnabled == 'true';
+
+    // ✅ null-safe 기본값 적용
+    final allowNotification = auth.allowNotification ?? true;
+    final allowMatching = auth.allowMatching ?? true;
+    final realtimeTranslation = auth.realtimeTranslation ?? false;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -43,7 +52,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // 상단 프로필 박스
+          // 상단 프로필
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: const BoxDecoration(
@@ -92,8 +101,8 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -101,63 +110,58 @@ class SettingsScreen extends StatelessWidget {
                       color: Colors.black.withOpacity(0.08),
                     ),
                   ),
-                  child: const Text(
-                    '인증됨',
+                  child: Text(
+                    enabled ? '인증됨' : '인증 전',
                     style: TextStyle(
-                      color: Color(0xFF34C759),
+                      color:
+                      enabled ? const Color(0xFF34C759) : Colors.grey,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                )
+                ),
               ],
             ),
           ),
 
           const SizedBox(height: 8),
 
-          // 토글 / 설정 리스트 (더미)
+          // 환경 설정
           _sectionHeader('환경 설정'),
           _switchTile(
             title: '알림 허용',
-            value: true,
+            value: allowNotification,
             onChanged: (v) {
-              // TODO: 실제 설정 연동
+              context.read<AuthState>().updateSettings(
+                allowNotification: v,
+              );
             },
           ),
           _switchTile(
             title: '매칭 허용',
-            value: true,
+            value: allowMatching,
             onChanged: (v) {
-              // TODO
+              context.read<AuthState>().updateSettings(
+                allowMatching: v,
+              );
             },
           ),
           _switchTile(
             title: '실시간 번역',
-            value: false,
+            value: realtimeTranslation,
             onChanged: (v) {
-              // TODO
+              context.read<AuthState>().updateSettings(
+                realtimeTranslation: v,
+              );
             },
           ),
 
+          // 앱 정보
           _sectionHeader('앱 정보'),
-          _navTile(
-            title: '공지사항',
-            onTap: () {
-              // TODO: 공지사항 화면 이동
-            },
-          ),
-          _navTile(
-            title: '고객센터',
-            onTap: () {
-              // TODO: 고객센터 화면 이동
-            },
-          ),
+          _navTile(title: '공지사항', onTap: () {}),
+          _navTile(title: '고객센터', onTap: () {}),
           ListTile(
-            title: const Text(
-              '앱 버전',
-              style: TextStyle(fontSize: 15),
-            ),
+            title: const Text('앱 버전', style: TextStyle(fontSize: 15)),
             trailing: const Text(
               'Beta',
               style: TextStyle(
@@ -169,7 +173,7 @@ class SettingsScreen extends StatelessWidget {
 
           const Divider(height: 24, thickness: 0.4),
 
-          // 🔥 로그아웃
+          // 로그아웃
           ListTile(
             title: const Center(
               child: Text(
@@ -202,10 +206,8 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               );
-
               if (ok == true) {
                 await context.read<AuthState>().logout();
-                // 모든 화면 제거 후 로그인 화면으로
                 if (context.mounted) {
                   Navigator.pushNamedAndRemoveUntil(
                     context,
@@ -217,7 +219,7 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
 
-          // 회원탈퇴 (아직 기능 미구현 - UI만)
+          // 회원탈퇴
           ListTile(
             title: const Center(
               child: Text(
@@ -229,8 +231,47 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
-            onTap: () {
-              // TODO: 회원탈퇴 기능 구현 시 연결
+            onTap: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('회원탈퇴'),
+                  content:
+                  const Text('정말 탈퇴하시겠습니까? 모든 데이터가 삭제됩니다.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('취소'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        '회원탈퇴',
+                        style: TextStyle(color: PalColors.danger),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              if (ok == true) {
+                final success =
+                await context.read<AuthState>().withdrawAccount();
+                if (success && context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/',
+                        (route) => false,
+                  );
+                } else {
+                  final msg = context.read<AuthState>().error ??
+                      '회원탈퇴에 실패했습니다.';
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(msg)),
+                    );
+                  }
+                }
+              }
             },
           ),
 
@@ -240,44 +281,33 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _sectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 13,
-          color: PalColors.textSecondary,
-          fontWeight: FontWeight.w600,
-        ),
+  Widget _sectionHeader(String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 13,
+        color: PalColors.textSecondary,
+        fontWeight: FontWeight.w600,
       ),
-    );
-  }
+    ),
+  );
 
-  Widget _navTile({required String title, VoidCallback? onTap}) {
-    return ListTile(
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 15),
-      ),
-      trailing: const Icon(Icons.chevron_right, size: 20),
-      onTap: onTap,
-    );
-  }
+  Widget _navTile({required String title, VoidCallback? onTap}) => ListTile(
+    title: Text(title, style: const TextStyle(fontSize: 15)),
+    trailing: const Icon(Icons.chevron_right, size: 20),
+    onTap: onTap,
+  );
 
   Widget _switchTile({
     required String title,
     required bool value,
     required ValueChanged<bool> onChanged,
-  }) {
-    return SwitchListTile(
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 15),
-      ),
-      value: value,
-      onChanged: onChanged,
-      activeColor: PalColors.orange,
-    );
-  }
+  }) =>
+      SwitchListTile(
+        title: Text(title, style: const TextStyle(fontSize: 15)),
+        value: value,
+        onChanged: onChanged,
+        activeColor: PalColors.orange,
+      );
 }

@@ -83,6 +83,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/posts/**").authenticated()
                         // 채팅 API는 인증 필요
                         .requestMatchers("/api/chat/**").authenticated()
+                        // 프로필 관련은 인증 필요
+                        .requestMatchers("/api/profile/**").authenticated()
                         // 나머지는 전부 인증 필요
                         .anyRequest().authenticated()
                 )

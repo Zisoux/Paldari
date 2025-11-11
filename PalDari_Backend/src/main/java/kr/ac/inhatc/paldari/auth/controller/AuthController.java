@@ -55,6 +55,7 @@ public class AuthController {
     }
 
     // ==== DTOs ====
+
     public static record SignUpRequest(
             @NotBlank String username,
             @Email String email,
@@ -88,10 +89,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
         try {
-            // username 기준 조회
             User user = userService.getByUsername(req.username());
 
-            // 비밀번호 검증
             if (user.getPassword() == null ||
                     !passwordEncoder.matches(req.password(), user.getPassword())) {
                 throw new BadCredentialsException("bad credentials");
@@ -101,7 +100,7 @@ public class AuthController {
                 throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
             }
 
-            String subject = user.getUsername(); // 토큰 subject
+            String subject = user.getUsername();
 
             String accessToken = jwtTokenProvider.generateAccessToken(subject);
             String refreshToken = jwtTokenProvider.generateRefreshToken(subject);
@@ -196,11 +195,14 @@ public class AuthController {
 
     // ================= 비밀번호 재설정 =================
 
-    @PostMapping(path = "/pw-reset/request",
-            consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(
+            path = "/pw-reset/request",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
     public ResponseEntity<?> pwResetRequest(@RequestBody Map<String, String> body) {
         String username = body.getOrDefault("username", "").trim();
-        String email    = body.getOrDefault("email", "").trim();
+        String email = body.getOrDefault("email", "").trim();
 
         if (username.isEmpty() || email.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "username과 email은 필수입니다."));
@@ -211,8 +213,8 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("message", "사용자 정보가 일치하지 않습니다."));
         }
 
-        String code = String.format("%06d", (int)(Math.random() * 1_000_000));
-        String key  = key(username, email);
+        String code = String.format("%06d", (int) (Math.random() * 1_000_000));
+        String key = key(username, email);
         codeStore.put(key, new CodeEntry(code, Instant.now().plus(codeTtl), false));
         attemptStore.put(key, new AttemptEntry(0));
 
@@ -221,12 +223,15 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("ok", true));
     }
 
-    @PostMapping(path = "/pw-reset/confirm",
-            consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(
+            path = "/pw-reset/confirm",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
     public ResponseEntity<?> pwResetConfirm(@RequestBody Map<String, String> body) {
-        String username   = body.getOrDefault("username", "").trim();
-        String email      = body.getOrDefault("email", "").trim();
-        String code       = body.getOrDefault("code", "").trim();
+        String username = body.getOrDefault("username", "").trim();
+        String email = body.getOrDefault("email", "").trim();
+        String code = body.getOrDefault("code", "").trim();
         String newPwPlain = body.getOrDefault("newPassword", "").trim();
 
         if (username.isEmpty() || email.isEmpty() || code.isEmpty() || newPwPlain.isEmpty()) {
@@ -288,8 +293,24 @@ public class AuthController {
         return ResponseEntity.ok(Map.of(
                 "username", user.getUsername(),
                 "email", user.getEmail(),
-                "role", user.getRole()
+                "role", user.getRole(),
+                "enabled", user.isEnabled()
         ));
+    }
+
+    // ================= 회원탈퇴 =================
+
+    @DeleteMapping("/withdraw")
+    public ResponseEntity<?> withdraw(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("message", "UNAUTHORIZED"));
+        }
+
+        String username = principal.getName();
+        userService.deleteByUsername(username); // 아래에서 설명할 메서드 필요
+
+        return ResponseEntity.ok(Map.of("message", "Account deleted"));
     }
 
     // ================= 내부 유틸 =================
@@ -303,12 +324,16 @@ public class AuthController {
         final Instant expiresAt;
         volatile boolean used;
         CodeEntry(String code, Instant expiresAt, boolean used) {
-            this.code = code; this.expiresAt = expiresAt; this.used = used;
+            this.code = code;
+            this.expiresAt = expiresAt;
+            this.used = used;
         }
     }
 
     private static final class AttemptEntry {
         int count;
-        AttemptEntry(int c) { this.count = c; }
+        AttemptEntry(int c) {
+            this.count = c;
+        }
     }
 }

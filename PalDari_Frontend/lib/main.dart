@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:paldari/screens/settings_screen.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
@@ -65,6 +66,8 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const ChatListScreen());
             case '/myPage':
               return MaterialPageRoute(builder: (_) => const MyPageScreen());
+            case '/settings':
+              return MaterialPageRoute(builder: (_) => const SettingsScreen());
             default:
               return MaterialPageRoute(builder: (_) => const LoginScreen());
           }

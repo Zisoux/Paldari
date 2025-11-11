@@ -42,6 +42,12 @@ public class UserService implements UserDetailsService {
         );
     }
 
+    @Transactional
+    public void deleteByUsername(String username) {
+        userRepository.deleteByUsername(username);
+    }
+
+
     // ================= 회원가입 / 이메일 인증 =================
 
     @Transactional

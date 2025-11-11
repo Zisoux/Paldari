@@ -1,13 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/pal_bottom_nav.dart';
 
-class MyPageScreen extends StatelessWidget {
+class MyPageScreen extends StatefulWidget {
   const MyPageScreen({super.key});
 
   @override
+  State<MyPageScreen> createState() => _MyPageScreenState();
+}
+
+class _MyPageScreenState extends State<MyPageScreen> {
+  final _tagController = TextEditingController();
+  final _regionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // 화면 진입 시 태그/지역 최신화 (조용히 실패 무시)
+    // addPostFrameCallback 써서 빌드 전에 read 에러 안 나게
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthState>();
+      auth.reloadTags();
+      auth.reloadRegions();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tagController.dispose();
+    _regionController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 넓은 화면(웹)에서 너무 퍼지지 않도록 최대 폭 제한 (모바일 느낌 유지)
     const maxContentWidth = 480.0;
+    final auth = context.watch<AuthState>();
+
+    final username = (auth.profile?['username'] as String?) ?? 'User';
+    final email = (auth.profile?['email'] as String?) ?? '';
+    final initial =
+    username.isNotEmpty ? username[0].toUpperCase() : 'U';
+
+    // 혹시라도 auth.tags / regions 가 null인 구현이 남아있다면 방어
+    final List<String> tags =
+    (auth.tags is List<String>) ? auth.tags : const <String>[];
+    final List<String> regions =
+    (auth.regions is List<String>) ? auth.regions : const <String>[];
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF7F1),
@@ -25,13 +65,10 @@ class MyPageScreen extends StatelessWidget {
         ),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      bottomNavigationBar: const PalBottomNav(
-        currentIndex: 4, // 마이페이지 탭
-      ),
+      bottomNavigationBar: const PalBottomNav(currentIndex: 4),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // 여기서 num 오류 안 나게 정확히 double로 처리
             final double contentWidth =
             constraints.maxWidth > maxContentWidth
                 ? maxContentWidth
@@ -39,16 +76,14 @@ class MyPageScreen extends StatelessWidget {
 
             return Center(
               child: SingleChildScrollView(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 16),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: contentWidth,
-                  ),
+                  constraints: BoxConstraints(maxWidth: contentWidth),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 상단 프로필 영역
+                      // 프로필 헤더
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -67,9 +102,9 @@ class MyPageScreen extends StatelessWidget {
                                   color: const Color(0xFF2C2C2C),
                                 ),
                               ),
-                              const Text(
-                                'N',
-                                style: TextStyle(
+                              Text(
+                                initial,
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 26,
                                   fontWeight: FontWeight.w500,
@@ -82,33 +117,36 @@ class MyPageScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Nur',
-                                  style: TextStyle(
+                                Text(
+                                  username,
+                                  style: const TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w700,
                                     color: Colors.black,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
-                                const Text(
-                                  '123456789@malay...',
-                                  style: TextStyle(
+                                Text(
+                                  email,
+                                  style: const TextStyle(
                                     fontSize: 14,
                                     color: Colors.black87,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 6),
                                 GestureDetector(
                                   onTap: () {
-                                    // TODO: 배경 변경 액션
+                                    // TODO: 배경 변경
                                   },
                                   child: Text(
                                     '배경 변경',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.black.withOpacity(0.5),
-                                      decoration: TextDecoration.underline,
+                                      decoration:
+                                      TextDecoration.underline,
                                     ),
                                   ),
                                 ),
@@ -117,7 +155,8 @@ class MyPageScreen extends StatelessWidget {
                           ),
                           IconButton(
                             onPressed: () {
-                              // TODO: 설정 화면 이동 등
+                              Navigator.pushNamed(
+                                  context, '/settings');
                             },
                             icon: const Icon(
                               Icons.settings_outlined,
@@ -129,14 +168,15 @@ class MyPageScreen extends StatelessWidget {
 
                       const SizedBox(height: 24),
 
-                      // 평점 카드
+                      // 평점 카드 (목업)
                       const _SectionCard(
                         title: '평점',
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                              crossAxisAlignment:
+                              CrossAxisAlignment.end,
                               children: [
                                 Text(
                                   '5.0',
@@ -164,11 +204,16 @@ class MyPageScreen extends StatelessWidget {
                               ],
                             ),
                             SizedBox(height: 12),
-                            _RatingBarRow(star: 5, count: 18, ratio: 1.0),
-                            _RatingBarRow(star: 4, count: 0, ratio: 0.0),
-                            _RatingBarRow(star: 3, count: 0, ratio: 0.0),
-                            _RatingBarRow(star: 2, count: 0, ratio: 0.0),
-                            _RatingBarRow(star: 1, count: 0, ratio: 0.0),
+                            _RatingBarRow(
+                                star: 5, count: 18, ratio: 1.0),
+                            _RatingBarRow(
+                                star: 4, count: 0, ratio: 0.0),
+                            _RatingBarRow(
+                                star: 3, count: 0, ratio: 0.0),
+                            _RatingBarRow(
+                                star: 2, count: 0, ratio: 0.0),
+                            _RatingBarRow(
+                                star: 1, count: 0, ratio: 0.0),
                           ],
                         ),
                       ),
@@ -176,11 +221,11 @@ class MyPageScreen extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       // 태그 카드
-                      const _SectionCard(
+                      _SectionCard(
                         title: '태그',
                         trailing: Text(
-                          '5/5',
-                          style: TextStyle(
+                          '${tags.length}/5',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Colors.black54,
                           ),
@@ -189,11 +234,25 @@ class MyPageScreen extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _TagChip('#생활'),
-                            _TagChip('#지역'),
-                            _TagChip('#취업'),
-                            _TagChip('#학업'),
-                            _TagChip('#안전'),
+                            for (final t in tags)
+                              _TagChip(
+                                label: t,
+                                onDelete: () => context
+                                    .read<AuthState>()
+                                    .removeTag(t),
+                              ),
+                            if (tags.length < 5)
+                              _AddChip(
+                                hint: '#태그 추가',
+                                controller: _tagController,
+                                onSubmitted: (text) async {
+                                  final v = text.trim();
+                                  if (v.isEmpty) return;
+                                  await context
+                                      .read<AuthState>()
+                                      .addTag(v);
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -201,11 +260,11 @@ class MyPageScreen extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       // 지역 카드
-                      const _SectionCard(
+                      _SectionCard(
                         title: '지역',
                         trailing: Text(
-                          '2/5',
-                          style: TextStyle(
+                          '${regions.length}/5',
+                          style: const TextStyle(
                             fontSize: 14,
                             color: Colors.black54,
                           ),
@@ -214,8 +273,25 @@ class MyPageScreen extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _TagChip('#쿠알라룸푸르'),
-                            _TagChip('#코타키나발루'),
+                            for (final r in regions)
+                              _TagChip(
+                                label: r,
+                                onDelete: () => context
+                                    .read<AuthState>()
+                                    .removeRegion(r),
+                              ),
+                            if (regions.length < 5)
+                              _AddChip(
+                                hint: '#지역 추가',
+                                controller: _regionController,
+                                onSubmitted: (text) async {
+                                  final v = text.trim();
+                                  if (v.isEmpty) return;
+                                  await context
+                                      .read<AuthState>()
+                                      .addRegion(v);
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -233,7 +309,7 @@ class MyPageScreen extends StatelessWidget {
   }
 }
 
-// 공통 섹션 카드 위젯
+// 공통 섹션 카드
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
@@ -253,8 +329,8 @@ class _SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -286,38 +362,99 @@ class _SectionCard extends StatelessWidget {
 // 태그 칩
 class _TagChip extends StatelessWidget {
   final String label;
+  final VoidCallback onDelete;
 
-  const _TagChip(this.label);
+  const _TagChip({
+    required this.label,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 11),
+      ),
+      backgroundColor: const Color(0x7FF39D52),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: Colors.black.withOpacity(0.3),
+          width: 0.6,
+        ),
+      ),
+      deleteIcon: const Icon(Icons.close, size: 14),
+      onDeleted: onDelete,
+    );
+  }
+}
+
+// 입력 칩 (엔터 + 플러스 둘 다 동작)
+class _AddChip extends StatelessWidget {
+  final String hint;
+  final TextEditingController controller;
+  final Future<void> Function(String) onSubmitted;
+
+  const _AddChip({
+    required this.hint,
+    required this.controller,
+    required this.onSubmitted,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0x7FF39D52),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.black.withOpacity(0.3),
-          width: 0.8,
+          color: Colors.black.withOpacity(0.2),
         ),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 11,
-          color: Colors.black,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 90,
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: hint,
+                border: InputBorder.none,
+              ),
+              style: const TextStyle(fontSize: 11),
+              onSubmitted: (v) async {
+                final text = v.trim();
+                if (text.isEmpty) return;
+                await onSubmitted(text);
+                controller.clear();
+              },
+            ),
+          ),
+          InkWell(
+            child: const Icon(Icons.add, size: 16),
+            onTap: () async {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+              await onSubmitted(text);
+              controller.clear();
+            },
+          ),
+        ],
       ),
     );
   }
 }
 
-// 평점 바 한 줄
+// 평점 바 (목업)
 class _RatingBarRow extends StatelessWidget {
   final int star;
   final int count;
-  final double ratio; // 0.0 ~ 1.0
+  final double ratio;
 
   const _RatingBarRow({
     required this.star,
