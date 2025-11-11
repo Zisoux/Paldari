@@ -137,21 +137,19 @@ class AuthState with ChangeNotifier {
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401) {
-        if (kDebugMode) {
-          print('silent me() 401 -> clear tokens');
-        }
+        // 토큰 무효 → 조용히 정리
         await _clearAuthSilently();
-      } else {
-        if (kDebugMode) {
-          print('loadProfile silently failed: $e');
-        }
+      } else if (kDebugMode) {
+        print('loadProfile silently failed: $e');
       }
     } catch (e) {
-      if (kDebugMode) {
+      // 여기서도 굳이 UNAUTHORIZED 찍고 싶지 않으면 주석 처리 가능
+      if (kDebugMode && e.toString() != 'UNAUTHORIZED') {
         print('loadProfile silently failed: $e');
       }
     }
   }
+
 
   // ===== 회원가입 / 로그인 / 로그아웃 =====
 
