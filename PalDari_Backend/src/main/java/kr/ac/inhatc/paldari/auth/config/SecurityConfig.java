@@ -70,9 +70,7 @@ public class SecurityConfig {
                         // 인증 없이 허용
                         .requestMatchers(
                                 "/",
-                                "/api/auth/signup",
-                                "/api/auth/login",
-                                "/api/auth/verify",
+                                "/api/auth/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/oauth-success"

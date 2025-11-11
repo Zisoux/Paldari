@@ -1,52 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:paldari/screens/chat_list_screen.dart';
-import 'package:paldari/screens/find_email_screen.dart';
-import 'package:paldari/screens/find_pw_screen.dart';
-import 'package:paldari/screens/my_page_screen.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
-import 'services/secure_storage.dart';
-import 'services/api_client.dart';
-import 'services/auth_service.dart';
+
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/find_email_screen.dart';
+import 'screens/find_pw_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/oauth_success_screen.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_web_plugins/url_strategy.dart';
 import 'screens/posts_screen.dart';
+import 'screens/chat_list_screen.dart';
+import 'screens/my_page_screen.dart';
 
 void main() {
   if (kIsWeb) {
-    usePathUrlStrategy(); // /oauth-success 형태(해시 제거)
+    // /#/oauth-success 대신 /oauth-success 형태로 사용
+    usePathUrlStrategy();
   }
-  final storage = SecureStorage();
-  final api = ApiClient(storage);
-  final auth = AuthService(api, storage);
 
-  runApp(MyApp(auth));
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final AuthService auth;
-  const MyApp(this.auth, {super.key});
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AuthState(auth),
+      // ✅ AuthState는 내부에서 AuthService + ApiClient + SecureStorage 생성
+      create: (_) => AuthState(),
       child: MaterialApp(
         title: 'Paldari',
+        debugShowCheckedModeBanner: false,
         initialRoute: '/',
 
-        // query parameter 포함 라우트 처리
         onGenerateRoute: (settings) {
           final uri = Uri.parse(settings.name ?? '/');
 
+          // ✅ OAuth 성공 콜백 처리
           if (uri.path == '/oauth-success') {
-            final token = uri.queryParameters['token'];
+            // access / refresh는 OAuthSuccessScreen 안에서 Uri.base로 직접 읽음
             return MaterialPageRoute(
-              builder: (context) => OAuthSuccessScreen(token: token),
+              builder: (_) => const OAuthSuccessScreen(),
               settings: settings,
             );
           }

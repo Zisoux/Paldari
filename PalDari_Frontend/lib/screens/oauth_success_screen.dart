@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
 class OAuthSuccessScreen extends StatefulWidget {
-  final String? token; // query parameter token을 받기 위해 추가
-
-  const OAuthSuccessScreen({super.key, this.token});
+  const OAuthSuccessScreen({super.key});
 
   @override
   State<OAuthSuccessScreen> createState() => _OAuthSuccessScreenState();
@@ -19,18 +17,24 @@ class _OAuthSuccessScreenState extends State<OAuthSuccessScreen> {
   }
 
   void _handleOAuthRedirect() {
-    // Flutter 웹에서 redirect URL에서 token 읽기
-    final uri = Uri.base; // /oauth-success?token=...
-    final token = widget.token ?? uri.queryParameters['token'];
+    final uri = Uri.base; // /oauth-success?access=...&refresh=...
+    final access = uri.queryParameters['access'];
+    final refresh = uri.queryParameters['refresh'];
 
-    if (token != null) {
+    if (access != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
-        // AuthState에 token 저장
-        await context.read<AuthState>().setTokenFromCallback(token);
+        await context.read<AuthState>().setTokensFromCallback(
+          accessToken: access,
+          refreshToken: refresh,
+        );
         if (mounted) {
-          // 저장 후 홈 화면으로 이동
           Navigator.pushReplacementNamed(context, '/home');
         }
+      });
+    } else {
+      // 액세스 토큰이 없으면 실패 처리 (옵션)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
       });
     }
   }
@@ -38,9 +42,7 @@ class _OAuthSuccessScreenState extends State<OAuthSuccessScreen> {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

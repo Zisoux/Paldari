@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_users_email", columnList = "email", unique = true)
 })
 public class User {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -32,30 +33,33 @@ public class User {
     private String password;  // 암호화된 비밀번호
 
     @Column(nullable = false)
-    private String provider = "LOCAL";  // LOCAL OR GOOGLE
+    private String provider = "LOCAL";  // LOCAL or GOOGLE
 
     @Column(nullable = false)
     private boolean enabled;  // 이메일 인증 여부
 
-    private String gender;  // 성별
-
-    private LocalDate birthdate;  // 생년월일
-
-    private String country;  // 출신국가
-
-    private String livingIn;  // 거주국가
-
-    private String language;  // 사용하는 언어
-
-    private String introduction;  // 자기소개
+    private String gender;
+    private LocalDate birthdate;
+    private String country;
+    private String livingIn;
+    private String language;
+    private String introduction;
 
     @Column(nullable = false)
-    private String role = "ROLE_USER"; // 기본 권한
+    private String role = "ROLE_USER";
 
     @CreatedDate
-    private LocalDateTime created; // 생성일
+    private LocalDateTime created;
 
-    public User(String username, String email, String password, String provider, boolean enabled, String role, LocalDateTime created) {
+    // 🔹 Refresh Token 컬럼 추가
+    @Column(name = "refresh_token")
+    private String refreshToken;
+
+    @Column(name = "refresh_token_expiry")
+    private LocalDateTime refreshTokenExpiry;
+
+    public User(String username, String email, String password,
+                String provider, boolean enabled, String role, LocalDateTime created) {
         this.username = username;
         this.email = email;
         this.password = password;
@@ -65,14 +69,14 @@ public class User {
         this.created = created;
     }
 
-    public User(String username, String email, String password, String provider, boolean enabled) {
+    public User(String username, String email, String password,
+                String provider, boolean enabled) {
         this.username = username;
         this.email = email;
         this.password = password;
         this.provider = provider;
         this.enabled = enabled;
         this.role = "ROLE_USER";
-        this.created = java.time.LocalDateTime.now();
+        this.created = LocalDateTime.now();
     }
-
 }

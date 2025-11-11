@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../config.dart';            // apiBase (예: http://10.0.2.2:8080)
+import '../config.dart';                // apiBase
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/secure_storage.dart';
 
 /// /api/auth/findEmail 응답 해석 결과
 class FindEmailResult {
@@ -19,31 +21,52 @@ class FindEmailResult {
 }
 
 class AuthState with ChangeNotifier {
-  final AuthService _auth;
+  final SecureStorage _storage = SecureStorage();
+  late final AuthService _auth;
 
   bool loading = false;
   Map<String, dynamic>? profile;
   String? error;
 
-  String? _accessToken; // ✅ STOMP, API 등에서 쓸 현재 토큰 캐시
+  String? _accessToken; // STOMP, API 등에서 쓸 현재 액세스 토큰
+  String? _refreshToken;
 
-  AuthState(this._auth);
+  AuthState() {
+    _auth = AuthService(ApiClient(), _storage);
+    _init();
+  }
 
-  /// STOMP / HTTP 어디서든 가져다 쓰는 현재 액세스 토큰
+  // ====== getters ======
+
+  bool get isLoggedIn => _accessToken != null;
+
   String? get accessToken => _accessToken;
 
-  /// 현재 로그인한 유저 아이디 (백엔드 me() 응답 기준)
-  String? get username =>
-      (profile?['username'] as String?)?.trim().isNotEmpty == true
-          ? (profile?['username'] as String?)!.trim()
-          : null;
+  String? get refreshToken => _refreshToken;
 
-  // ---------------- 내부 유틸 ----------------
-
-  Future<void> _syncTokenFromAuthService() async {
-    // ⛏ AuthService에 getToken() 구현해서 SecureStorage에서 읽어오도록 해줘.
-    _accessToken = await _auth.getToken();
+  /// 현재 로그인한 유저 아이디 (백엔드 /api/auth/me 응답 기준)
+  String? get username {
+    final name = profile?['username'] as String?;
+    if (name == null) return null;
+    final trimmed = name.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
+
+  // ====== 초기화 ======
+
+  Future<void> _init() async {
+    _accessToken = await _storage.readAccessToken();
+    _refreshToken = await _storage.readRefreshToken();
+
+    // 이미 토큰이 있으면 프로필 한번 조용히 시도
+    if (_accessToken != null) {
+      await _loadProfileSilently();
+    }
+
+    notifyListeners();
+  }
+
+  // ====== 내부 유틸 ======
 
   String _extractMsg(String body) {
     try {
@@ -73,7 +96,19 @@ class AuthState with ChangeNotifier {
     return u.isEmpty ? null : u;
   }
 
-  // ---------------- 인증 기본 흐름 ----------------
+  Future<void> _loadProfileSilently() async {
+    try {
+      final me = await _auth.me();
+      profile = me;
+    } catch (e) {
+      if (kDebugMode) {
+        print('loadProfile silently failed: $e');
+      }
+      // 여기서는 error 안 건드림
+    }
+  }
+
+  // ====== 회원가입 / 로그인 / 로그아웃 ======
 
   Future<void> signup(String u, String e, String p) async {
     loading = true;
@@ -89,24 +124,24 @@ class AuthState with ChangeNotifier {
     }
   }
 
+  /// 일반 로그인
+  /// - 성공 시 AuthService가 access/refresh를 SecureStorage에 저장
+  /// - 여기서는 메모리 캐시 + 프로필 동기화
   Future<bool> login(String u, String p) async {
     loading = true;
     error = null;
     notifyListeners();
 
     try {
-      // 1) 로그인 (실패하면 여기서 문자열 예외 던져짐)
       await _auth.login(username: u, password: p);
 
-      // 2) 토큰 싱크
-      await _syncTokenFromAuthService();
+      _accessToken = await _storage.readAccessToken();
+      _refreshToken = await _storage.readRefreshToken();
 
-      // 3) 프로필은 조용히 시도 (실패해도 로그인 성공은 유지)
       await _loadProfileSilently();
 
       return true;
     } catch (e) {
-      // 여기서 잡히는 건 "진짜 로그인 실패"만.
       error = e.toString();
       return false;
     } finally {
@@ -115,17 +150,15 @@ class AuthState with ChangeNotifier {
     }
   }
 
-
-
-  // 화면에서 직접 호출해서 "내 정보" 갱신하고 싶을 때 사용하는 버전
+  /// /api/auth/me를 강제로 다시 불러와 UI 갱신하고 싶을 때
   Future<void> loadProfile() async {
     loading = true;
     error = null;
     notifyListeners();
     try {
-      profile = await _auth.me();
+      final me = await _auth.me();
+      profile = me;
     } catch (e) {
-      // 여기서는 에러를 사용자에게 보여줘도 됨
       error = e.toString();
     } finally {
       loading = false;
@@ -133,39 +166,35 @@ class AuthState with ChangeNotifier {
     }
   }
 
-// 로그인 직후 내부에서만 쓰는 조용한 버전
-  Future<void> _loadProfileSilently() async {
-    try {
-      profile = await _auth.me();
-    } catch (e) {
-      // ❗여기서는 error를 건드리지 않음 (DioException 안 보이게)
-      if (kDebugMode) {
-        print('loadProfile failed silently: $e');
-      }
-    }
-  }
+  /// OAuth 콜백 등에서 access/refresh를 바로 받는 경우
+  /// - OAuthSuccessScreen에서 호출
+  Future<void> setTokensFromCallback({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
+    await _storage.saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
 
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
 
-
-  /// OAuth 콜백 등에서 토큰 바로 주입되는 경우
-  Future<void> setTokenFromCallback(String token) async {
-    // AuthService가 토큰을 저장
-    await _auth.saveTokenFromCallback(token);
-
-    // 메모리 캐시도 동기화
-    _accessToken = token;
-
-    await loadProfile();
-  }
-
-  Future<void> logout() async {
-    await _auth.logout();
-    profile = null;
-    _accessToken = null;
+    await _loadProfileSilently();
     notifyListeners();
   }
 
-  // ---------------- 아이디 찾기 (이메일 기반) ----------------
+  Future<void> logout() async {
+    await _auth.logout(); // 내부에서 SecureStorage 삭제 처리
+    profile = null;
+    _accessToken = null;
+    _refreshToken = null;
+    error = null;
+    loading = false;
+    notifyListeners();
+  }
+
+  // ====== 아이디 찾기 (이메일 기반) ======
 
   Future<FindEmailResult> checkEmailAndFetchUsername(String email) async {
     error = null;
@@ -241,7 +270,7 @@ class AuthState with ChangeNotifier {
     return res.exists;
   }
 
-  // ---------------- 비밀번호 재설정 ----------------
+  // ====== 비밀번호 재설정 (기존 HTTP 방식 유지) ======
 
   Future<bool> requestPwResetCode(String username, String email) async {
     error = null;

@@ -1,18 +1,35 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorage {
-  static const _key = 'auth_token';
+  static const _accessKey = 'access_token';
+  static const _refreshKey = 'refresh_token';
+
   final _storage = const FlutterSecureStorage();
 
-  Future<void> saveToken(String token) =>
-      _storage.write(key: _key, value: token);
+  Future<void> saveAccessToken(String token) =>
+      _storage.write(key: _accessKey, value: token);
 
-  Future<String?> readToken() =>
-      _storage.read(key: _key);
+  Future<void> saveRefreshToken(String token) =>
+      _storage.write(key: _refreshKey, value: token);
 
-  Future<void> deleteToken() =>
-      _storage.delete(key: _key);
+  Future<String?> readAccessToken() =>
+      _storage.read(key: _accessKey);
 
-  // AuthService / AuthState 에서 공통으로 쓰는 토큰 getter
-  Future<String?> getToken() => readToken();
+  Future<String?> readRefreshToken() =>
+      _storage.read(key: _refreshKey);
+
+  Future<void> saveTokens({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
+    await _storage.write(key: _accessKey, value: accessToken);
+    if (refreshToken != null) {
+      await _storage.write(key: _refreshKey, value: refreshToken);
+    }
+  }
+
+  Future<void> deleteTokens() async {
+    await _storage.delete(key: _accessKey);
+    await _storage.delete(key: _refreshKey);
+  }
 }

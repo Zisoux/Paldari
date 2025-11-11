@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:paldari/screens/settings_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/pal_bottom_nav.dart';
@@ -84,10 +85,18 @@ class _PalTopAppBar extends StatelessWidget {
             tooltip: 'Notifications',
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
             icon: const Icon(Icons.settings_outlined, color: Colors.black87),
             tooltip: 'Settings',
           ),
+
           if (username != null && username!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: 8.0),

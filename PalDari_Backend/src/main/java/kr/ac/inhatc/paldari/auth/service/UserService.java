@@ -3,11 +3,9 @@ package kr.ac.inhatc.paldari.auth.service;
 import jakarta.transaction.Transactional;
 import kr.ac.inhatc.paldari.auth.entity.User;
 import kr.ac.inhatc.paldari.auth.entity.VerificationToken;
-import kr.ac.inhatc.paldari.auth.jwt.JwtTokenProvider;
 import kr.ac.inhatc.paldari.auth.repository.UserRepository;
 import kr.ac.inhatc.paldari.auth.repository.VerificationTokenRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -25,24 +23,21 @@ public class UserService implements UserDetailsService {
     private final VerificationTokenRepository tokenRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final MailService mailService;
-    private final JwtTokenProvider jwtTokenProvider;
 
-    // ================= UserDetailsService 구현 =================
+    // ================= UserDetailsService =================
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // username 기준으로 DB 조회 (LOCAL/GOOGLE 공통)
         User u = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
         return new org.springframework.security.core.userdetails.User(
                 u.getUsername(),
-                // 소셜 로그인 유저는 password null일 수 있으므로 빈 문자열 처리
                 u.getPassword() == null ? "" : u.getPassword(),
-                u.isEnabled(), // enabled
-                true,          // accountNonExpired
-                true,          // credentialsNonExpired
-                true,          // accountNonLocked
+                u.isEnabled(),
+                true,
+                true,
+                true,
                 List.of(new SimpleGrantedAuthority(u.getRole()))
         );
     }
@@ -63,7 +58,7 @@ public class UserService implements UserDetailsService {
                 email,
                 passwordEncoder.encode(rawPassword),
                 "LOCAL",
-                false,                 // 이메일 인증 전
+                false,
                 "ROLE_USER",
                 LocalDateTime.now()
         );
@@ -98,55 +93,12 @@ public class UserService implements UserDetailsService {
         return true;
     }
 
-    // ================= 로그인 + JWT 발급 =================
+    // ================= 프로필 / 조회 =================
 
-    /**
-     * AuthenticationManager 없이 직접 인증 후 JWT 발급
-     */
-    public String loginAndIssueToken(String username, String rawPassword) {
-        User u = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-        // 로컬 계정만 패스워드 로그인
-        if (u.getPassword() == null || !passwordEncoder.matches(rawPassword, u.getPassword())) {
-            throw new BadCredentialsException("Bad credentials");
-        }
-        if (!u.isEnabled()) {
-            throw new IllegalStateException("Email not verified");
-        }
-
-        return jwtTokenProvider.generateToken(u.getUsername());
-    }
-
-    // ================= 프로필 조회 =================
-
-    /**
-     * /api/auth/me 에서 사용할 사용자 프로필 맵
-     */
-    public Map<String, Object> getProfile(String username) {
-        User u = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", u.getId());
-        map.put("username", u.getUsername());
-        map.put("email", u.getEmail());
-        map.put("provider", u.getProvider());
-        map.put("enabled", u.isEnabled());
-        map.put("role", u.getRole());
-        map.put("created", u.getCreated());
-        return map;
-    }
-
-    /**
-     * /api/auth/me 등에서 도메인 User 자체가 필요할 때 사용
-     */
     public User getByUsername(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
-
-    // ================= 기타 유틸/검색 =================
 
     public User findByEmail(String email) {
         return userRepository.findByEmail(email).orElse(null);
@@ -154,6 +106,12 @@ public class UserService implements UserDetailsService {
 
     public User findByUsernameAndEmail(String username, String email) {
         return userRepository.findByUsernameAndEmail(username, email).orElse(null);
+    }
+
+    // AuthController 등에서 쓸 수 있게 래핑
+    @Transactional
+    public User save(User user) {
+        return userRepository.save(user);
     }
 
     @Transactional

@@ -14,15 +14,65 @@ class ApiService {
       receiveTimeout: const Duration(seconds: 5),
     ),
   ) {
-    // 요청마다 JWT 붙이기
+    // 1) 요청마다 access 토큰 붙이기
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.readToken();
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
+          final accessToken = await _storage.readAccessToken();
+          if (accessToken != null && accessToken.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $accessToken';
           }
           return handler.next(options);
+        },
+
+        // 2) 401 나오면 refresh 시도 후 한 번 재시도
+        onError: (e, handler) async {
+          // 이미 한 번 재시도했던 요청이면 바로 종료 (무한 루프 방지)
+          final isRetry = e.requestOptions.extra['__retry'] == true;
+
+          if (e.response?.statusCode == 401 && !isRetry) {
+            final refreshToken = await _storage.readRefreshToken();
+            if (refreshToken == null || refreshToken.isEmpty) {
+              return handler.next(e); // 리프레시도 없으면 그냥 실패
+            }
+
+            try {
+              // refresh 요청
+              final refreshRes = await _dio.post(
+                '/api/auth/refresh',
+                data: {'refreshToken': refreshToken},
+                options: Options(
+                  headers: {
+                    'Authorization': null, // 기존 토큰 헤더 제거
+                  },
+                ),
+              );
+
+              final data = refreshRes.data;
+              final newAccess = data['accessToken'] as String?;
+              final newRefresh = data['refreshToken'] as String?;
+
+              if (newAccess != null) {
+                await _storage.saveTokens(
+                  accessToken: newAccess,
+                  refreshToken: newRefresh ?? refreshToken,
+                );
+
+                // 원래 요청 복구해서 재시도
+                final opts = e.requestOptions;
+                opts.headers['Authorization'] = 'Bearer $newAccess';
+                opts.extra['__retry'] = true;
+
+                final cloneResponse = await _dio.fetch(opts);
+                return handler.resolve(cloneResponse);
+              }
+            } catch (_) {
+              // refresh 실패시 -> 토큰 삭제하고 그냥 401 흘려보냄
+              await _storage.deleteTokens();
+            }
+          }
+
+          return handler.next(e);
         },
       ),
     );

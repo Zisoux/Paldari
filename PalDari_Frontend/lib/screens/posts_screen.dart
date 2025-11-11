@@ -128,6 +128,7 @@ class _PostsScreenState extends State<PostsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF7F1),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: const Color(0xFFFFF7F1),
         centerTitle: true,
