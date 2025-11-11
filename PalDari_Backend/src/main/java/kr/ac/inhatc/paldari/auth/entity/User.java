@@ -74,4 +74,5 @@ public class User {
         this.role = "ROLE_USER";
         this.created = java.time.LocalDateTime.now();
     }
+
 }
