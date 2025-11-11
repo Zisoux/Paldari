@@ -54,6 +54,9 @@ class PalBottomNav extends StatelessWidget {
           case 3: // 커뮤니티
             Navigator.pushReplacementNamed(context, '/posts');
             break;
+          case 4: // 마이페이지
+            Navigator.pushReplacementNamed(context, '/myPage');
+            break;
           default:
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('아직 준비 중인 메뉴입니다.')),

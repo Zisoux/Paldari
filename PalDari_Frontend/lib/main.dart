@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:paldari/screens/chat_list_screen.dart';
 import 'package:paldari/screens/find_email_screen.dart';
 import 'package:paldari/screens/find_pw_screen.dart';
+import 'package:paldari/screens/my_page_screen.dart';
 import 'package:provider/provider.dart';
 import 'services/secure_storage.dart';
 import 'services/api_client.dart';
@@ -65,6 +66,8 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const PostsScreen());
             case '/chats':
               return MaterialPageRoute(builder: (_) => const ChatListScreen());
+            case '/myPage':
+              return MaterialPageRoute(builder: (_) => const MyPageScreen());
             default:
               return MaterialPageRoute(builder: (_) => const LoginScreen());
           }
