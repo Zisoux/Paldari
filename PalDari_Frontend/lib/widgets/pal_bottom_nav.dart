@@ -48,6 +48,9 @@ class PalBottomNav extends StatelessWidget {
           case 0: // 홈
             Navigator.pushReplacementNamed(context, '/home');
             break;
+          case 1:
+            Navigator.pushReplacementNamed(context, '/matching');
+            break;
           case 2: // 채팅
             Navigator.pushReplacementNamed(context, '/chats');
             break;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:paldari/screens/matching_screen.dart';
 import 'package:paldari/screens/settings_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -60,6 +61,8 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(builder: (_) => const FindPwScreen());
             case '/home':
               return MaterialPageRoute(builder: (_) => const PalHomeScreen());
+            case '/matching':
+              return MaterialPageRoute(builder: (_) => const MatchingScreen());
             case '/posts':
               return MaterialPageRoute(builder: (_) => const PostsScreen());
             case '/chats':
