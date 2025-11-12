@@ -13,4 +13,8 @@ public class PostResponse {
     private String country;
     private String category;
     private String createdAt;
+
+    private String language;
+    private Boolean isForeigner;
+    private String persona;
 }

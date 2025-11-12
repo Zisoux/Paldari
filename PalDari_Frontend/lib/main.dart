@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:paldari/screens/settings_screen.dart';
+//import 'package:paldari/screens/posts_screen.dart'; // ✅
+
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
@@ -61,7 +63,8 @@ class MyApp extends StatelessWidget {
             case '/home':
               return MaterialPageRoute(builder: (_) => const PalHomeScreen());
             case '/posts':
-              return MaterialPageRoute(builder: (_) => const PostsScreen());
+              return MaterialPageRoute(builder: (_) => const PostsScreen()); // ✅ const 제거
+
             case '/chats':
               return MaterialPageRoute(builder: (_) => const ChatListScreen());
             case '/myPage':

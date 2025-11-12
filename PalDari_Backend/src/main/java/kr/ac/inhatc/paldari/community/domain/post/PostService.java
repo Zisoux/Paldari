@@ -49,14 +49,21 @@ public class PostService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 필요");
         }
 
-        Post saved = repo.save(new Post(
+        // 기본 필드 생성자 사용
+        Post p = new Post(
                 username,
                 req.getTitle(),
                 req.getContent(),
                 req.getCountry(),
                 req.getCategory()
-        ));
+        );
 
+        // 🔹 추가 메타데이터 매핑
+        p.setLanguage(req.getLanguage());
+        p.setIsForeigner(req.getIsForeigner());
+        p.setPersona(req.getPersona());
+
+        Post saved = repo.save(p);
         return toDto(saved);
     }
 
@@ -78,6 +85,11 @@ public class PostService {
         p.setContent(req.getContent());
         p.setCountry(req.getCountry());
         p.setCategory(req.getCategory());
+
+        // 🔹 추가 메타데이터 매핑
+        p.setLanguage(req.getLanguage());
+        p.setIsForeigner(req.getIsForeigner());
+        p.setPersona(req.getPersona());
 
         return toDto(p);
     }
@@ -111,7 +123,11 @@ public class PostService {
                 p.getContent(),
                 p.getCountry(),
                 p.getCategory(),
-                p.getCreatedAt() != null ? p.getCreatedAt().toString() : null
+                p.getCreatedAt() != null ? p.getCreatedAt().toString() : null,
+                // 🔹 확장 필드들
+                p.getLanguage(),
+                p.getIsForeigner(),
+                p.getPersona()
         );
     }
 }

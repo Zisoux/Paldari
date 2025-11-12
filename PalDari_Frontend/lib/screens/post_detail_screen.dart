@@ -1,7 +1,14 @@
 // lib/screens/post_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart'; // 👈 404 감지용
+import 'package:dio/dio.dart';
 import '../services/api.dart';
+
+// ===== PalDari 톤 =====
+const _bgHeader = Color(0xFFFFF7F1);
+const _titlePal = Color(0xFF734124);
+const _deepBrown = Color(0xFF260101);
+const _hintGrey  = Color(0xFF9F9FA1);
+const _chipGrey  = Color(0xFFF2F2F2);
 
 class PostDetailScreen extends StatefulWidget {
   final int postId;
@@ -134,7 +141,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _startEdit(Map<String, dynamic> comment) {
     setState(() {
       editingCommentId = (comment['id'] as num).toInt();
-      _editingController.text = comment['content'] ?? '';
+      _editingController.text = (comment['content'] ?? '').toString();
     });
   }
 
@@ -210,21 +217,75 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  // ====== helper UI ======
+  String _initials(String name) {
+    if (name.isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts.first.characters.first;
+    return (parts.first.characters.first + parts.last.characters.first);
+  }
+
+  Widget _tagChips(dynamic tagsField) {
+    if (tagsField is List && tagsField.isNotEmpty) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: -6,
+        children: tagsField.map<Widget>((t) {
+          final text = t.toString();
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _chipGrey,
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Text(
+              text.startsWith('#') ? text : '#$text',
+              style: const TextStyle(
+                color: Color(0xFF595959),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF121F2F) : Colors.white,
       appBar: AppBar(
-        title: const Text('상세'),
+        backgroundColor: _bgHeader,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _titlePal),
+          onPressed: () => Navigator.pop(context),
+          tooltip: '뒤로가기',
+        ),
+        centerTitle: true,
+        title: const Text(
+          '상세',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         actions: [
           IconButton(
-            tooltip: '삭제',
-            icon: const Icon(Icons.delete),
-            onPressed: loadingPost ? null : _deletePost,
+            tooltip: '새로고침',
+            icon: const Icon(Icons.refresh, color: _titlePal),
+            onPressed: _loadAll,
           ),
           IconButton(
-            tooltip: '새로고침',
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAll,
+            tooltip: '삭제',
+            icon: const Icon(Icons.delete, color: _titlePal),
+            onPressed: loadingPost ? null : _deletePost,
           ),
         ],
       ),
@@ -234,33 +295,100 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ? Center(child: Text('게시물 불러오기 오류: $postError'))
           : Column(
         children: [
-          // Post content
+          // ===== 게시글 카드 =====
+          Card(
+            margin: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            elevation: 0.5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 작성자/메타
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0xFFF39D52),
+                        child: Text(
+                          _initials((post!['authorUsername'] ?? '').toString()),
+                          style: const TextStyle(
+                            color: _titlePal,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (post!['authorUsername'] ?? '-').toString(),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              // createdAt은 서버 포맷 그대로 노출 (가공 원하면 파서 추가)
+                              (post!['createdAt'] ?? '').toString(),
+                              style: const TextStyle(
+                                color: _hintGrey,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // 옵션 메뉴 필요 시 PopupMenuButton으로 확장
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 제목
+                  Text(
+                    (post!['title'] ?? '').toString(),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // 태그 섹션 (post['tags']가 List일 때)
+                  _tagChips(post!['tags']),
+
+                  if (post!['tags'] is List && (post!['tags'] as List).isNotEmpty)
+                    const SizedBox(height: 10),
+
+                  // 본문
+                  Text(
+                    (post!['content'] ?? '').toString(),
+                    style: const TextStyle(fontSize: 15, height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ===== 댓글 헤더 =====
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(post!['title'] ?? '', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(post!['content'] ?? ''),
-                const SizedBox(height: 8),
-                Text('작성자: ${post!['authorUsername'] ?? '-'} · ${post!['createdAt'] ?? ''}', style: const TextStyle(fontSize: 12)),
+                const Text('댓글', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('${comments.length}', style: const TextStyle(color: _hintGrey)),
               ],
             ),
           ),
           const Divider(height: 1),
-          // Comments header
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // ✅ 수정 완료
-              children: [
-                const Text('댓글', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('${comments.length}'),
-              ],
-            ),
-          ),
-          // Comments list
+
+          // ===== 댓글 리스트 =====
           Expanded(
             child: loadingComments
                 ? const Center(child: CircularProgressIndicator())
@@ -285,17 +413,34 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 itemBuilder: (_, i) {
                   final c = comments[i];
                   final cid = (c['id'] as num).toInt();
-                  final content = c['content'] ?? '';
+                  final content = (c['content'] ?? '').toString();
                   final isEditing = editingCommentId == cid;
+                  final createdAt = (c['createdAt'] ?? '').toString();
+
                   return ListTile(
+                    leading: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: const Color(0xFFF39D52),
+                      child: Text(
+                        _initials((c['authorUsername'] ?? 'U').toString()),
+                        style: const TextStyle(
+                          color: _titlePal,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                     title: isEditing
                         ? TextField(
                       controller: _editingController,
-                      decoration: const InputDecoration(hintText: '댓글 수정'),
+                      decoration: const InputDecoration(
+                        hintText: '댓글 수정',
+                        isDense: true,
+                        border: OutlineInputBorder(),
+                      ),
                       maxLines: null,
                     )
                         : Text(content),
-                    subtitle: Text('${c['createdAt'] ?? ''}'),
+                    subtitle: Text(createdAt, style: const TextStyle(fontSize: 12, color: _hintGrey)),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -329,23 +474,56 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               ),
             ),
           ),
-          // Comment input
+
+          // ===== 댓글 입력 =====
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F1B2A) : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF1E2937) : const Color(0xFFECECEC),
+                    width: 1,
+                  ),
+                ),
+              ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _commentController,
-                      decoration: const InputDecoration(hintText: '댓글을 입력하세요'),
+                      decoration: InputDecoration(
+                        hintText: '댓글을 입력하세요',
+                        isDense: true,
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF162635) : const Color(0xFFFDFDFD),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFECECEC)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFECECEC)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      maxLines: 3,
+                      minLines: 1,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  ElevatedButton(
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xCCFAAD55),
+                      foregroundColor: _deepBrown,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     onPressed: submittingComment ? null : _submitComment,
                     child: submittingComment
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('작성'),
                   ),
                 ],

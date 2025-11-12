@@ -29,6 +29,16 @@ public class Post {
     @Column(length = 50)
     private String category;
 
+    // 🔹 추가된 필드
+    @Column(length = 50)
+    private String language;   // 예: 한국어, 영어, 일본어 등
+
+    @Column(name = "is_foreigner")
+    private Boolean isForeigner; // true=외국인, false=내국인
+
+    @Column(length = 50)
+    private String persona;    // "내국인" 또는 "외국인" (문자 방식)
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -61,7 +71,7 @@ public class Post {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // getters & setters
+    // ─────────────────────── Getters / Setters ───────────────────────
     public Long getId() { return id; }
 
     public String getAuthorUsername() { return authorUsername; }
@@ -78,6 +88,15 @@ public class Post {
 
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
+
+    public Boolean getIsForeigner() { return isForeigner; }
+    public void setIsForeigner(Boolean isForeigner) { this.isForeigner = isForeigner; }
+
+    public String getPersona() { return persona; }
+    public void setPersona(String persona) { this.persona = persona; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

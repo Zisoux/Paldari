@@ -107,24 +107,32 @@ class ApiService {
     );
   }
 
+  /// 언어/내외국인까지 지원하도록 확장된 게시글 생성
+  ///
+  /// 백엔드 DTO가 아래 키들을 받아야 저장됨:
+  /// - country (String)
+  /// - category (String)
+  /// - language (String)
+  /// - isForeigner (bool)  // 불린 규격 선택 시
+  /// - persona (String)    // 텍스트 규격 선택 시 ('내국인' | '외국인')
   Future<Map<String, dynamic>> createPost({
     required String title,
     required String content,
     String? country,
     String? category,
+    String? language,     // 🔹 추가
+    bool? isForeigner,    // 🔹 추가
+    String? persona,      // 🔹 추가
   }) async {
     final body = <String, dynamic>{
       'title': title,
       'content': content,
+      if (country != null && country.isNotEmpty) 'country': country,
+      if (category != null && category.isNotEmpty) 'category': category,
+      if (language != null && language.isNotEmpty) 'language': language,
+      if (isForeigner != null) 'isForeigner': isForeigner,
+      if (persona != null && persona.isNotEmpty) 'persona': persona,
     };
-
-    // PostRequest에 country/category가 있으면 여기 매핑
-    if (country != null && country.isNotEmpty) {
-      body['country'] = country;
-    }
-    if (category != null && category.isNotEmpty) {
-      body['category'] = category;
-    }
 
     final res = await _dio.post('/api/posts', data: body);
 
@@ -172,8 +180,7 @@ class ApiService {
     }
   }
 
-  Future<void> updateComment(int postId, int commentId,
-      {required String content}) async {
+  Future<void> updateComment(int postId, int commentId, {required String content}) async {
     final res = await _dio.put(
       '/api/posts/$postId/comments/$commentId',
       data: {'content': content},
