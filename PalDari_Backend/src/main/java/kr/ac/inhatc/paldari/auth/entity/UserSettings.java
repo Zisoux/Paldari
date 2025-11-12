@@ -3,6 +3,8 @@ package kr.ac.inhatc.paldari.auth.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
 @Getter
@@ -16,6 +18,7 @@ public class UserSettings {
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
 
     private boolean allowNotification = true;

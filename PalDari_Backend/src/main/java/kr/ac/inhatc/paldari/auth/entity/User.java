@@ -51,7 +51,6 @@ public class User {
     @CreatedDate
     private LocalDateTime created;
 
-    // 🔹 Refresh Token 컬럼 추가
     @Column(name = "refresh_token")
     private String refreshToken;
 
