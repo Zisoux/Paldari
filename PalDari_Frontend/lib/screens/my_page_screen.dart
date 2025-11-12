@@ -138,10 +138,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                 const SizedBox(height: 6),
                                 GestureDetector(
                                   onTap: () {
-                                    // TODO: 배경 변경
+                                    Navigator.pushNamed(context, '/editProfile');
                                   },
                                   child: Text(
-                                    '배경 변경',
+                                    '내 정보 수정',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.black.withOpacity(0.5),

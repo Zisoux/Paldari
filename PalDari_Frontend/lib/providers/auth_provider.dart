@@ -501,6 +501,65 @@ class AuthState with ChangeNotifier {
     }
   }
 
+  // ===== Profile Basic (gender, birthdate, country, livingIn, language, introduction) =====
+
+  Future<Map<String, dynamic>?> fetchProfileBasic() async {
+    if (!isLoggedIn) return null;
+    try {
+      final res = await _api.dio.get('/api/profile/basic');
+      if (res.data is Map<String, dynamic>) {
+        // 전체 profile에도 병합해두면 앱 전반에서 동일하게 참조 가능
+        profile = {...?profile, ...res.data as Map<String, dynamic>};
+        notifyListeners();
+        return res.data as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('fetchProfileBasic failed: $e');
+    }
+    return null;
+  }
+
+  Future<bool> updateProfileBasic({
+    String? gender,          // "MALE"/"FEMALE"/"OTHER" 등 문자열
+    DateTime? birthdate,     // null 아니면 yyyy-MM-dd로 변환
+    String? country,
+    String? livingIn,
+    String? language,
+    String? introduction,
+  }) async {
+    if (!isLoggedIn) return false;
+
+    final payload = <String, dynamic>{};
+    if (gender != null) payload['gender'] = gender;
+    if (birthdate != null) {
+      final y = birthdate.year.toString().padLeft(4, '0');
+      final m = birthdate.month.toString().padLeft(2, '0');
+      final d = birthdate.day.toString().padLeft(2, '0');
+      payload['birthdate'] = '$y-$m-$d';
+    }
+    if (country != null) payload['country'] = country;
+    if (livingIn != null) payload['livingIn'] = livingIn;
+    if (language != null) payload['language'] = language;
+    if (introduction != null) payload['introduction'] = introduction;
+
+    if (payload.isEmpty) return true;
+
+    try {
+      final res = await _api.dio.patch('/api/profile/basic', data: payload);
+      if (res.data is Map<String, dynamic>) {
+        // 성공 시 로컬 캐시 갱신
+        profile = {...?profile, ...res.data as Map<String, dynamic>};
+        notifyListeners();
+        return true;
+      }
+      return true; // 204 No Content 같은 경우
+    } catch (e) {
+      debugPrint('updateProfileBasic failed: $e');
+      return false;
+    }
+  }
+
+
   // ===== Tags =====
 
   Future<void> reloadTags({bool silent = false}) async {

@@ -1,6 +1,9 @@
 package kr.ac.inhatc.paldari.auth.controller;
 
+import kr.ac.inhatc.paldari.auth.dto.ProfileBasicDto;
+import kr.ac.inhatc.paldari.auth.dto.UpdateProfileBasicRequest;
 import kr.ac.inhatc.paldari.auth.service.UserProfileService;
+import kr.ac.inhatc.paldari.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +20,7 @@ import java.util.Map;
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
+    private final UserRepository userRepository; // (선택) 존재 확인 등 필요시 사용
 
     private String username(Principal principal) {
         if (principal == null) {
@@ -37,7 +41,7 @@ public class UserProfileController {
 
     /**
      * 환경설정 수정 (부분 업데이트)
-     * PATCH /api/user/settings
+     * PATCH /api/profile/settings
      * {
      *   "allowNotification": true/false,
      *   "allowMatching": true/false,
@@ -70,6 +74,27 @@ public class UserProfileController {
         return ResponseEntity.ok(updated);
     }
 
+    // ========== Basic Profile ==========
+
+    /** 내 정보 조회 (DTO) */
+    @GetMapping("/basic")
+    public ResponseEntity<ProfileBasicDto> getBasic(Principal principal) {
+        String uname = username(principal);
+        ProfileBasicDto dto = userProfileService.getBasic(uname);
+        return ResponseEntity.ok(dto);
+    }
+
+    /** 내 정보 부분 수정 (DTO) */
+    @PatchMapping("/basic")
+    public ResponseEntity<ProfileBasicDto> updateBasic(
+            @RequestBody UpdateProfileBasicRequest req,
+            Principal principal
+    ) {
+        String uname = username(principal);
+        ProfileBasicDto dto = userProfileService.updateBasic(uname, req);
+        return ResponseEntity.ok(dto);
+    }
+
     // ========== Tags ==========
 
     /** 내 태그 조회 -> { "items": ["#생활", "#학업"] } */
@@ -89,10 +114,8 @@ public class UserProfileController {
         String uname = username(principal);
         String tag = (body.getOrDefault("tag", "")).trim();
         if (tag.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "tag 는 필수입니다."));
+            return ResponseEntity.badRequest().body(Map.of("message", "tag 는 필수입니다."));
         }
-
         List<String> tags = userProfileService.addTag(uname, tag);
         return ResponseEntity.ok(Map.of("items", tags));
     }
@@ -106,10 +129,8 @@ public class UserProfileController {
         String uname = username(principal);
         String tag = (body.getOrDefault("tag", "")).trim();
         if (tag.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "tag 는 필수입니다."));
+            return ResponseEntity.badRequest().body(Map.of("message", "tag 는 필수입니다."));
         }
-
         List<String> tags = userProfileService.removeTag(uname, tag);
         return ResponseEntity.ok(Map.of("items", tags));
     }
@@ -133,10 +154,8 @@ public class UserProfileController {
         String uname = username(principal);
         String region = (body.getOrDefault("region", "")).trim();
         if (region.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "region 은 필수입니다."));
+            return ResponseEntity.badRequest().body(Map.of("message", "region 은 필수입니다."));
         }
-
         List<String> regions = userProfileService.addRegion(uname, region);
         return ResponseEntity.ok(Map.of("items", regions));
     }
@@ -150,10 +169,8 @@ public class UserProfileController {
         String uname = username(principal);
         String region = (body.getOrDefault("region", "")).trim();
         if (region.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "region 은 필수입니다."));
+            return ResponseEntity.badRequest().body(Map.of("message", "region 은 필수입니다."));
         }
-
         List<String> regions = userProfileService.removeRegion(uname, region);
         return ResponseEntity.ok(Map.of("items", regions));
     }
