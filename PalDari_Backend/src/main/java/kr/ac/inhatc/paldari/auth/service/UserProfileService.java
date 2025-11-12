@@ -1,11 +1,15 @@
 package kr.ac.inhatc.paldari.auth.service;
 
 import jakarta.transaction.Transactional;
+import kr.ac.inhatc.paldari.auth.dto.ProfileBasicDto;
+import kr.ac.inhatc.paldari.auth.dto.UpdateProfileBasicRequest;
 import kr.ac.inhatc.paldari.auth.entity.*;
 import kr.ac.inhatc.paldari.auth.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -20,12 +24,76 @@ public class UserProfileService {
     private final UserTagRepository tagRepository;
     private final UserRegionRepository regionRepository;
 
+    // ====================== 공통 ======================
     private User getUserOrThrow(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
     }
 
-    // ===== Settings =====
+    private static String emptyToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    // ====================== Basic (내 정보) ======================
+
+    /** 내 정보 조회 (DTO 반환) */
+    public ProfileBasicDto getBasic(String username) {
+        User u = getUserOrThrow(username);
+
+        ProfileBasicDto dto = new ProfileBasicDto();
+        dto.setGender(emptyToNull(u.getGender()));
+        dto.setBirthdate(u.getBirthdate() == null ? null : u.getBirthdate().toString()); // yyyy-MM-dd
+        dto.setCountry(emptyToNull(u.getCountry()));
+        dto.setLivingIn(emptyToNull(u.getLivingIn()));
+        dto.setLanguage(emptyToNull(u.getLanguage()));
+        dto.setIntroduction(emptyToNull(u.getIntroduction()));
+        return dto;
+    }
+
+    /**
+     * 내 정보 부분 수정 (null 은 “수정 안 함”, 빈문자열은 null 로 저장)
+     * 저장 후 최신 DTO 반환
+     */
+    public ProfileBasicDto updateBasic(String username, UpdateProfileBasicRequest req) {
+        User u = getUserOrThrow(username);
+
+        if (req.getGender() != null) {
+            u.setGender(emptyToNull(req.getGender()));
+        }
+        if (req.getBirthdate() != null) {
+            String b = emptyToNull(req.getBirthdate());
+            if (b == null) {
+                u.setBirthdate(null);
+            } else {
+                // 형식 검증: 잘못된 형식이면 IllegalArgumentException 던져서 400으로 매핑되게 하거나
+                // GlobalExceptionHandler에서 메시지 변환
+                try {
+                    u.setBirthdate(LocalDate.parse(b)); // ISO yyyy-MM-dd
+                } catch (DateTimeParseException e) {
+                    throw new IllegalArgumentException("Invalid birthdate format (expected yyyy-MM-dd): " + b);
+                }
+            }
+        }
+        if (req.getCountry() != null) {
+            u.setCountry(emptyToNull(req.getCountry()));
+        }
+        if (req.getLivingIn() != null) {
+            u.setLivingIn(emptyToNull(req.getLivingIn()));
+        }
+        if (req.getLanguage() != null) {
+            u.setLanguage(emptyToNull(req.getLanguage()));
+        }
+        if (req.getIntroduction() != null) {
+            u.setIntroduction(emptyToNull(req.getIntroduction()));
+        }
+
+        userRepository.save(u);
+        return getBasic(username);
+    }
+
+    // ====================== Settings ======================
 
     public Map<String, Object> getSettings(String username) {
         User user = getUserOrThrow(username);
@@ -33,10 +101,11 @@ public class UserProfileService {
                 .orElseGet(() -> {
                     UserSettings ns = new UserSettings();
                     ns.setUser(user);
-                    // 기본값 true/true/false 는 엔티티 디폴트 사용
+                    // 엔티티 디폴트(true/true/false)가 있다면 그대로 사용
                     return settingsRepository.save(ns);
                 });
 
+        // boolean primitive만 담으므로 Map.of 사용 안전
         return Map.of(
                 "allowNotification", s.isAllowNotification(),
                 "allowMatching", s.isAllowMatching(),
@@ -59,7 +128,7 @@ public class UserProfileService {
                 });
 
         if (allowNotification != null) s.setAllowNotification(allowNotification);
-        if (allowMatching != null) s.setAllowMatching(allowMatching);
+        if (allowMatching != null)     s.setAllowMatching(allowMatching);
         if (realtimeTranslation != null) s.setRealtimeTranslation(realtimeTranslation);
 
         settingsRepository.save(s);
@@ -71,7 +140,7 @@ public class UserProfileService {
         );
     }
 
-    // ===== Tags =====
+    // ====================== Tags ======================
 
     public List<String> getTags(String username) {
         User user = getUserOrThrow(username);
@@ -82,7 +151,7 @@ public class UserProfileService {
 
     public List<String> addTag(String username, String tag) {
         User user = getUserOrThrow(username);
-        String norm = tag.trim();
+        String norm = tag == null ? "" : tag.trim();
         if (norm.isEmpty()) return getTags(username);
 
         if (!tagRepository.existsByUserAndTag(user, norm)) {
@@ -96,14 +165,14 @@ public class UserProfileService {
 
     public List<String> removeTag(String username, String tag) {
         User user = getUserOrThrow(username);
-        String norm = tag.trim();
+        String norm = tag == null ? "" : tag.trim();
         if (!norm.isEmpty()) {
             tagRepository.deleteByUserAndTag(user, norm);
         }
         return getTags(username);
     }
 
-    // ===== Regions =====
+    // ====================== Regions ======================
 
     public List<String> getRegions(String username) {
         User user = getUserOrThrow(username);
@@ -114,7 +183,7 @@ public class UserProfileService {
 
     public List<String> addRegion(String username, String region) {
         User user = getUserOrThrow(username);
-        String norm = region.trim();
+        String norm = region == null ? "" : region.trim();
         if (norm.isEmpty()) return getRegions(username);
 
         if (!regionRepository.existsByUserAndRegion(user, norm)) {
@@ -128,7 +197,7 @@ public class UserProfileService {
 
     public List<String> removeRegion(String username, String region) {
         User user = getUserOrThrow(username);
-        String norm = region.trim();
+        String norm = region == null ? "" : region.trim();
         if (!norm.isEmpty()) {
             regionRepository.deleteByUserAndRegion(user, norm);
         }
