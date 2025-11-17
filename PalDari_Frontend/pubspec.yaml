@@ -10,17 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # 네트워크
-  http: ^1.5.0           # ← 파일 업로드용 MultipartRequest 사용 (업데이트)
-  dio: ^5.5.0
-
-  # STOMP (실시간)
+  http: ^1.2.1
   stomp_dart_client: ^3.0.1
 
   # UI/상태
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
+
+  # 네트워크
+  dio: ^5.5.0
 
   # 외부 링크/브라우저 오픈
   url_launcher: ^6.3.0
