@@ -24,7 +24,8 @@ import java.util.UUID;
 @CrossOrigin(origins = "*") // 필요시 (PostController와 맞추기)
 public class PostAttachmentController {
 
-    @Value("${file.upload-dir}")
+    // ✅ application.yml / application-local.yml 의 app.upload-dir 사용
+    @Value("${app.upload-dir}")
     private String uploadDir;
 
     private final PostRepository postRepository;
@@ -168,7 +169,7 @@ public class PostAttachmentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "요청한 게시글에 속한 첨부파일이 아닙니다.");
         }
 
-        // 3) 실제 파일 삭제 시도 (실패해도 예외는 안 던지고 로그 수준으로만 다룰 수 있음)
+        // 3) 실제 파일 삭제 시도
         String url = attachment.getUrl();
         if (url != null && !url.isBlank()) {
             String fileName = url;
@@ -177,10 +178,8 @@ public class PostAttachmentController {
             }
             File file = new File(uploadDir, fileName);
             if (file.exists()) {
-                // 삭제 실패해도 서비스 동작까지 막을 필요는 없어서 결과는 체크만
                 boolean deleted = file.delete();
                 if (!deleted) {
-                    // 필요하면 로그 라이브러리로 경고 출력
                     System.err.println("파일 삭제 실패: " + file.getAbsolutePath());
                 }
             }

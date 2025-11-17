@@ -65,3 +65,5 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Local Spring config (ignored)
+src/main/resources/application-local.yml

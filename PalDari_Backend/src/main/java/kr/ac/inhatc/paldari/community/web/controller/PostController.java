@@ -6,6 +6,7 @@ import kr.ac.inhatc.paldari.community.web.dto.PostDetailResponse;
 import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
 import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +20,15 @@ import java.util.List;
 public class PostController {
 
     private final PostService service;
+
+    /**
+     * 첨부파일 실제 저장 경로
+     * - application-local.yml 등에서 app.upload-dir 로 설정
+     * - 예) mac:  /Users/네이름/paldari_uploads
+     *       win:  D:/paldari_uploads
+     */
+    @Value("${app.upload-dir}")
+    private String uploadDir;
 
     /**
      * 게시글 목록 조회
