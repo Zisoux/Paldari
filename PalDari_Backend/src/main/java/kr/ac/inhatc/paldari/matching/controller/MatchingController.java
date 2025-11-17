@@ -107,6 +107,13 @@ public class MatchingController {
         return matchingService.createOrGetChatRoom(meId, request.getTargetUserId());
     }
 
+    @GetMapping("/home-pals")
+    public List<PalSummaryResponse> homePals(Authentication authentication) {
+        Long userId = currentUserId(authentication);
+        return matchingService.getHomePalList(userId);
+    }
+
+
     // ---------- 공통 유틸 ----------
 
     private Long currentUserId(Authentication authentication) {

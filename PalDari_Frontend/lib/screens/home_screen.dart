@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:paldari/screens/settings_screen.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
+import '../services/api.dart';
 import '../widgets/pal_bottom_nav.dart';
 
 /// PalDari Home Screen
@@ -18,33 +20,52 @@ class PalColors {
   static const textSecondary = Color(0xFF9F9FA1);
 }
 
-class PalHomeScreen extends StatelessWidget {
+/// =====================
+///    Home Screen
+/// =====================
+
+class PalHomeScreen extends StatefulWidget {
   const PalHomeScreen({super.key});
 
   @override
+  State<PalHomeScreen> createState() => _PalHomeScreenState();
+}
+
+class _PalHomeScreenState extends State<PalHomeScreen> {
+  final GlobalKey<_PalListSectionState> _listKey =
+  GlobalKey<_PalListSectionState>();
+
+  @override
   Widget build(BuildContext context) {
+    // auth는 지금은 안 쓰지만, 나중에 필요할 수도 있어서 남겨둠
     final auth = context.watch<AuthState>();
-    final username = (auth.profile?['username'] as String?)?.trim();
+    final _ = auth.profile;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(100),
-        child: _PalTopAppBar(username: username),
+        child: _PalTopAppBar(
+          onFilterTap: () {
+            _listKey.currentState?.openFilterBottomSheetFromOutside();
+          },
+        ),
       ),
-      body: const SafeArea(
+      body: SafeArea(
         top: false,
-        child: _PalListSection(),
+        child: _PalListSection(key: _listKey),
       ),
-      // ✅ 현재 탭 index = 0 (홈)
       bottomNavigationBar: const PalBottomNav(currentIndex: 0),
     );
   }
 }
 
 class _PalTopAppBar extends StatelessWidget {
-  const _PalTopAppBar({this.username});
-  final String? username;
+  const _PalTopAppBar({
+    required this.onFilterTap,
+  });
+
+  final VoidCallback onFilterTap;
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +101,9 @@ class _PalTopAppBar extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              // TODO: 알림 화면 혹은 Snackbar 등
+            },
             icon: const Icon(Icons.notifications_none, color: Colors.black87),
             tooltip: 'Notifications',
           ),
@@ -96,69 +119,365 @@ class _PalTopAppBar extends StatelessWidget {
             icon: const Icon(Icons.settings_outlined, color: Colors.black87),
             tooltip: 'Settings',
           ),
-
-          if (username != null && username!.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 180),
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                  Border.all(color: PalColors.orange.withOpacity(0.6)),
-                ),
-                child: Text(
-                  "환영합니다, '$username'님",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
+          IconButton(
+            onPressed: onFilterTap,
+            icon: const Icon(Icons.tune, color: Colors.black87),
+            tooltip: '필터',
+          ),
         ],
       ),
     );
   }
 }
 
-class _PalListSection extends StatelessWidget {
-  const _PalListSection();
+/// =====================
+///   Pal 리스트 + 필터
+/// =====================
+
+class _PalListSection extends StatefulWidget {
+  const _PalListSection({super.key});
+
+  @override
+  State<_PalListSection> createState() => _PalListSectionState();
+}
+
+class _PalListSectionState extends State<_PalListSection> {
+  final ApiService _api = ApiService();
+
+  bool _loading = false;
+  List<Pal> _allPals = [];
+  List<Pal> _displayPals = [];
+
+  // 필터 상태
+  String? _filterCountry;
+  String? _filterTag;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPals();
+  }
+
+  Future<void> _loadPals() async {
+    setState(() => _loading = true);
+    try {
+      final List<Map<String, dynamic>> raw = await _api.fetchHomePals();
+      final pals = raw.map((m) => Pal.fromJson(m)).toList();
+
+      setState(() {
+        _allPals = pals;
+        _applyFilter();
+      });
+    } catch (e) {
+      debugPrint('Failed to load home pals: $e');
+      setState(() {
+        _allPals = [];
+        _displayPals = [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  /// 외부(AppBar)에서 필터 버튼 눌렀을 때 호출
+  void openFilterBottomSheetFromOutside() {
+    _openFilterBottomSheet();
+  }
+
+  void _applyFilter() {
+    List<Pal> list = List.of(_allPals);
+
+    int score(Pal p) {
+      int s = 0;
+      if (_filterCountry != null &&
+          _filterCountry!.isNotEmpty &&
+          p.country == _filterCountry) {
+        s += 2;
+      }
+      if (_filterTag != null &&
+          _filterTag!.isNotEmpty &&
+          p.tags.contains(_filterTag)) {
+        s += 1;
+      }
+      return s;
+    }
+
+    list.sort((a, b) => score(b).compareTo(score(a)));
+
+    setState(() {
+      _displayPals = list;
+    });
+  }
+
+  Future<void> _openFilterBottomSheet() async {
+    String? tempCountry = _filterCountry;
+    String? tempTag = _filterTag;
+
+    final countries = _allPals
+        .map((p) => p.country)
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList();
+    final tags = _allPals
+        .expand((p) => p.tags)
+        .where((t) => t.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '필터 설정',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (countries.isNotEmpty) ...[
+                    const Text(
+                      '국가',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('전체'),
+                          selected: tempCountry == null,
+                          onSelected: (_) {
+                            setModalState(() {
+                              tempCountry = null;
+                            });
+                          },
+                        ),
+                        for (final c in countries)
+                          ChoiceChip(
+                            label: Text(c),
+                            selected: tempCountry == c,
+                            onSelected: (_) {
+                              setModalState(() {
+                                tempCountry = c;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  if (tags.isNotEmpty) ...[
+                    const Text(
+                      '관심 태그',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('전체'),
+                          selected: tempTag == null,
+                          onSelected: (_) {
+                            setModalState(() {
+                              tempTag = null;
+                            });
+                          },
+                        ),
+                        for (final t in tags)
+                          ChoiceChip(
+                            label: Text(t),
+                            selected: tempTag == t,
+                            onSelected: (_) {
+                              setModalState(() {
+                                tempTag = t;
+                              });
+                            },
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            tempCountry = null;
+                            tempTag = null;
+                          });
+                        },
+                        child: const Text('초기화'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx, true);
+                        },
+                        child: const Text('적용'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (applied == true) {
+      setState(() {
+        _filterCountry = tempCountry;
+        _filterTag = tempTag;
+      });
+      _applyFilter();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pals = _mockPals; // TODO: 실제 데이터 연동
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+    return Column(
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(
-            'Pal LIST',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Poppins',
-              color: Colors.black,
+        // ===== 필터 chip 표시 영역 (배경색 없음) =====
+        if (_filterCountry != null || _filterTag != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  if (_filterCountry != null)
+                    _ActiveFilterChip(
+                      label: '국가: ${_filterCountry!}',
+                      onClear: () {
+                        setState(() => _filterCountry = null);
+                        _applyFilter();
+                      },
+                    ),
+                  if (_filterTag != null)
+                    _ActiveFilterChip(
+                      label: '태그: ${_filterTag!}',
+                      onClear: () {
+                        setState(() => _filterTag = null);
+                        _applyFilter();
+                      },
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
-        ...pals.map(
-              (p) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: PalCard(pal: p),
+
+        // ===== 목록 영역 =====
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _displayPals.isEmpty
+              ? const Center(
+            child: Text(
+              '표시할 Pal이 없습니다.\n매칭을 통해 Pal을 늘려보세요!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 14,
+              ),
+            ),
+          )
+              : ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  'Pal LIST',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    fontFamily: 'Poppins',
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              ..._displayPals.map(
+                    (p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: PalCard(pal: p),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 }
+
+class _ActiveFilterChip extends StatelessWidget {
+  const _ActiveFilterChip({
+    super.key,
+    required this.label,
+    required this.onClear,
+  });
+
+  final String label;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: PalColors.orange),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onClear,
+            child: const Icon(
+              Icons.close,
+              size: 14,
+              color: Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// =====================
+///     Pal Card
+/// =====================
 
 class PalCard extends StatelessWidget {
   const PalCard({super.key, required this.pal});
@@ -171,7 +490,6 @@ class PalCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       onTap: () {
         // TODO: 여기서 Pal 상세 or 채팅방으로 이동
-        // 예: Navigator.pushNamed(context, '/chats');
       },
       child: Ink(
         decoration: BoxDecoration(
@@ -282,27 +600,57 @@ class _TagChip extends StatelessWidget {
   }
 }
 
-// ------------------ Mock Data & Model ------------------
+/// =====================
+///  Pal 모델 (JSON 매핑)
+/// =====================
+
 class Pal {
+  final int id;
   final String name;
   final String country;
   final List<String> tags;
   final bool online;
 
   Pal({
+    required this.id,
     required this.name,
     required this.country,
     required this.tags,
     this.online = false,
   });
 
-  String get initial => name.isNotEmpty ? name.characters.first : '?';
-}
+  String get initial =>
+      name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
 
-final _mockPals = <Pal>[
-  Pal(name: 'Mike', country: '미국', tags: ['#생활', '#학업'], online: true),
-  Pal(name: 'Sunny', country: '일본', tags: ['#지역', '#안전']),
-  Pal(name: 'Alice', country: '캐나다', tags: ['#생활', '#지역']),
-  Pal(name: 'Alex', country: '영국', tags: ['#학업', '#안전']),
-  Pal(name: 'Aby', country: '영국', tags: ['#생활', '#안전']),
-];
+  factory Pal.fromJson(Map<String, dynamic> json) {
+    final idDynamic = json['id'] ?? json['userId'];
+
+    final name = (json['nickname'] ??
+        json['username'] ??
+        json['name'] ??
+        'Unknown')
+        .toString();
+
+    final country = (json['country'] ?? '').toString();
+
+    List<String> tags = [];
+    final rawTags = json['tags'] ?? json['tagNames'];
+
+    if (rawTags is List) {
+      tags = rawTags.map((e) => e.toString()).toList();
+    }
+
+    final online =
+        json['online'] == true || json['isOnline'] == true;
+
+    return Pal(
+      id: idDynamic is int
+          ? idDynamic
+          : int.tryParse(idDynamic.toString()) ?? 0,
+      name: name,
+      country: country,
+      tags: tags,
+      online: online,
+    );
+  }
+}

@@ -189,10 +189,12 @@ public class MatchingService {
         return ChatRoomResponse.from(room);
     }
 
-    // (옵션) 홈 화면 기본 Pal 리스트 (목업 대신 DB 사용)
+    // 홈 화면 기본 Pal 리스트 (목업 대신 DB 사용)
     public List<PalSummaryResponse> getHomePalList(Long currentUserId) {
-        List<User> users = userRepository.findAllPalsForUser(currentUserId);
+        List<User> users = userRepository.findAll();  // ★ 전체 유저
+
         return users.stream()
+                .filter(u -> !u.getId().equals(currentUserId)) // 원하면 나 자신 제외
                 .map(PalSummaryResponse::from)
                 .toList();
     }
@@ -228,4 +230,6 @@ public class MatchingService {
         if ("무관".equals(gender)) return null; // "무관"이면 조건에서 제외
         return gender;
     }
+
+
 }

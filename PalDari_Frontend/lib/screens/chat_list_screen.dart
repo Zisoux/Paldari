@@ -62,7 +62,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
       );
 
-      debugPrint('GET /api/chat/rooms => ${res.statusCode} ${res.body}');
+      // debugPrint('GET /api/chat/rooms => ${res.statusCode} ${res.body}');
 
       if (res.statusCode == 200) {
         final List data = jsonDecode(res.body) as List;
@@ -130,6 +130,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   PreferredSizeWidget _buildTopBar() {
     return AppBar(
+      automaticallyImplyLeading: false,
       backgroundColor: PalColors.cream,
       elevation: 0,
       centerTitle: true,

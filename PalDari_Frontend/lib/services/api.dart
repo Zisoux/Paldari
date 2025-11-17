@@ -75,6 +75,33 @@ class ApiService {
     );
   }
 
+  /// 홈 화면 Pal 리스트 (현재 유저 기준으로 추천용 Pal 목록)
+  /// 백엔드: GET /api/matching/home-pals
+  ///
+  /// 응답 예시:
+  /// [
+  ///   { "id": 3, "nickname": "RedIndex", "country": "한국", "tags": ["#생활", "#학업"] },
+  ///   ...
+  /// ]
+  Future<List<Map<String, dynamic>>> fetchHomePals() async {
+    final res = await _dio.get('/api/matching/home-pals');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is List) {
+        return data
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      throw Exception('Unexpected home pals response format: $data');
+    }
+
+    throw Exception(
+      'Failed to load home pals: ${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
+
   // ========== POSTS ==========
 
   Future<List<Map<String, dynamic>>> fetchPosts() async {
