@@ -7,14 +7,18 @@ import lombok.Setter;
 @Getter
 @Setter
 public class PostRequest {
-
     @NotBlank(message = "제목은 필수입니다.")
     private String title;
 
     @NotBlank(message = "내용은 필수입니다.")
     private String content;
 
-    // 선택값 (프론트에서 주면 사용)
     private String country;
     private String category;
+
+    // 🔽 추가
+    private String language;     // '한국어', '영어' ...
+    private Boolean isForeigner; // 불린 규격을 쓸 때
+    private String persona;      // 텍스트 규격을 쓸 때 ('내국인'|'외국인')
 }
+

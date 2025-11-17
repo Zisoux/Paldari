@@ -76,6 +76,7 @@ public class SecurityConfig {
                                 "/oauth-success"
                         ).permitAll()
                         // 웹소켓 엔드포인트
+                        .requestMatchers("/uploads/**").permitAll()   // 🔥 여기에 추가
                         .requestMatchers("/ws-chat/**").permitAll()
                         // 게시글 조회는 공개
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()

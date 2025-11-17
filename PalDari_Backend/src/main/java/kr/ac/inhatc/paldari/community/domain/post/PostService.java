@@ -1,6 +1,8 @@
 package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.transaction.Transactional;
+import kr.ac.inhatc.paldari.community.web.dto.AttachmentDto;
+import kr.ac.inhatc.paldari.community.web.dto.PostDetailResponse;
 import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
 import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ public class PostService {
                 .map(this::toDto);
     }
 
+    // 🔹 기존 기본 조회 (필요하면 계속 사용)
     @Transactional(Transactional.TxType.SUPPORTS)
     public PostResponse get(Long id) {
         var p = repo.findById(id)
@@ -43,20 +46,57 @@ public class PostService {
         return toDto(p);
     }
 
+    // 🔹 상세 조회: 첨부 + 메타데이터까지 포함
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public PostDetailResponse getDetail(Long id) {
+        var p = repo.findById(id)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
+
+        var attachmentDtos = p.getAttachments()
+                .stream()
+                .map(a -> new AttachmentDto(
+                        a.getId(),
+                        a.getUrl(),
+                        a.getOriginalName()
+                ))
+                .toList();
+
+        return new PostDetailResponse(
+                p.getId(),
+                p.getTitle(),
+                p.getContent(),
+                p.getAuthorUsername(),
+                p.getCountry(),
+                p.getCategory(),
+                p.getLanguage(),
+                p.getIsForeigner(),
+                p.getPersona(),
+                attachmentDtos
+        );
+    }
+
     // 생성: Principal(username) 사용
     public PostResponse create(PostRequest req, String username) {
         if (username == null || username.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 필요");
         }
 
-        Post saved = repo.save(new Post(
+        // 기본 필드 생성자 사용
+        Post p = new Post(
                 username,
                 req.getTitle(),
                 req.getContent(),
                 req.getCountry(),
                 req.getCategory()
-        ));
+        );
 
+        // 🔹 추가 메타데이터 매핑
+        p.setLanguage(req.getLanguage());
+        p.setIsForeigner(req.getIsForeigner());
+        p.setPersona(req.getPersona());
+
+        Post saved = repo.save(p);
         return toDto(saved);
     }
 
@@ -78,6 +118,11 @@ public class PostService {
         p.setContent(req.getContent());
         p.setCountry(req.getCountry());
         p.setCategory(req.getCategory());
+
+        // 🔹 추가 메타데이터 매핑
+        p.setLanguage(req.getLanguage());
+        p.setIsForeigner(req.getIsForeigner());
+        p.setPersona(req.getPersona());
 
         return toDto(p);
     }
@@ -111,7 +156,11 @@ public class PostService {
                 p.getContent(),
                 p.getCountry(),
                 p.getCategory(),
-                p.getCreatedAt() != null ? p.getCreatedAt().toString() : null
+                p.getCreatedAt() != null ? p.getCreatedAt().toString() : null,
+                // 🔹 확장 필드들
+                p.getLanguage(),
+                p.getIsForeigner(),
+                p.getPersona()
         );
     }
 }

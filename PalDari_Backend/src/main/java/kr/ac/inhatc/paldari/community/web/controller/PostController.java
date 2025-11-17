@@ -2,6 +2,7 @@ package kr.ac.inhatc.paldari.community.web.controller;
 
 import jakarta.validation.Valid;
 import kr.ac.inhatc.paldari.community.domain.post.PostService;
+import kr.ac.inhatc.paldari.community.web.dto.PostDetailResponse;
 import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
 import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +30,11 @@ public class PostController {
     }
 
     /**
-     * 게시글 단건 조회
+     * 게시글 단건 조회 + 첨부파일 목록 + 메타데이터(국가/카테고리/언어/내외국인/페르소나)
      */
     @GetMapping("/{id}")
-    public PostResponse get(@PathVariable Long id) {
-        return service.get(id);
+    public PostDetailResponse get(@PathVariable Long id) {
+        return service.getDetail(id);
     }
 
     /**

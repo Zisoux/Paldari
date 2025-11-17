@@ -26,7 +26,7 @@ spring:
         registration:
           google:
             client-id: 148127187919-rtquq5ti1l14vqte2drpou34j074om6k.apps.googleusercontent.com
-            client-secret: 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 # 재발급 필요.. 노출됨!
+            client-secret: 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 # ⚠ 재발급 필요.. 노출됨!
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - openid
@@ -48,7 +48,6 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
-
 
   output:
     ansi:
@@ -83,3 +82,16 @@ spring:
       hibernate:
         format_sql: true
 
+  ####################################
+  # File Upload (Multipart)
+  ####################################
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
+
+####################################
+# File Upload Directory
+####################################
+file:
+  upload-dir: '/Users/test/Documents/GitHub/Paldari/PalDari_Backend/uploads'   # 서버 안에 파일이 저장될 폴더

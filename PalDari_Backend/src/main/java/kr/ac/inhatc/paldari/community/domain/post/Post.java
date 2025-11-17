@@ -2,6 +2,8 @@ package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "posts")
@@ -29,11 +31,29 @@ public class Post {
     @Column(length = 50)
     private String category;
 
+    // 🔹 추가된 필드
+    @Column(length = 50)
+    private String language;   // 예: 한국어, 영어, 일본어 등
+
+    @Column(name = "is_foreigner")
+    private Boolean isForeigner; // true=외국인, false=내국인
+
+    @Column(length = 50)
+    private String persona;    // "내국인" 또는 "외국인" (문자 방식)
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // 🔹 첨부파일 컬렉션 (1 : N)
+    @OneToMany(
+            mappedBy = "post",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<PostAttachment> attachments = new ArrayList<>();
 
     protected Post() {}
 
@@ -61,7 +81,7 @@ public class Post {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // getters & setters
+    // ─────────────────────── Getters / Setters ───────────────────────
     public Long getId() { return id; }
 
     public String getAuthorUsername() { return authorUsername; }
@@ -79,6 +99,34 @@ public class Post {
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
 
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
+
+    public Boolean getIsForeigner() { return isForeigner; }
+    public void setIsForeigner(Boolean isForeigner) { this.isForeigner = isForeigner; }
+
+    public String getPersona() { return persona; }
+    public void setPersona(String persona) { this.persona = persona; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public List<PostAttachment> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<PostAttachment> attachments) {
+        this.attachments = attachments;
+    }
+
+    // 🔹 편의 메서드
+    public void addAttachment(PostAttachment attachment) {
+        attachments.add(attachment);
+        attachment.setPost(this);
+    }
+
+    public void removeAttachment(PostAttachment attachment) {
+        attachments.remove(attachment);
+        attachment.setPost(null);
+    }
 }

@@ -4,6 +4,8 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:paldari/screens/edit_profile_screen.dart';
 import 'package:paldari/screens/matching_screen.dart';
 import 'package:paldari/screens/settings_screen.dart';
+//import 'package:paldari/screens/posts_screen.dart'; // ✅
+
 import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
@@ -65,7 +67,8 @@ class MyApp extends StatelessWidget {
             case '/matching':
               return MaterialPageRoute(builder: (_) => const MatchingScreen());
             case '/posts':
-              return MaterialPageRoute(builder: (_) => const PostsScreen());
+              return MaterialPageRoute(builder: (_) => const PostsScreen()); // ✅ const 제거
+
             case '/chats':
               return MaterialPageRoute(builder: (_) => const ChatListScreen());
             case '/myPage':
