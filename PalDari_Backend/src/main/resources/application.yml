@@ -16,9 +16,22 @@ app:
     redirect: http://localhost:5173/oauth-success
     fail: http://localhost:5173/oauth-fail
 
+  ####################################
+  # File Upload (기본값)
+  ####################################
+  # ⚠️ 설정이 하나도 없을 때 사용할 "안전한 기본값"
+  # 실제 개발/운영에서는 application-local.yml, application-prod.yml 등에서 덮어쓰기
+  upload-dir: "/tmp/uploads"
+
 spring:
   application:
     name: PalDari_Backend
+
+  ####################################
+  # Active Profile
+  ####################################
+  profiles:
+    active: local   # 🔥 application-local.yml 같이 로드되게 함
 
   security:
     oauth2:
@@ -90,11 +103,9 @@ spring:
       max-file-size: 20MB
       max-request-size: 50MB
 
-####################################
-# File Upload Directory
-####################################
-file:
-  upload-dir: '/Users/test/Documents/GitHub/Paldari/PalDari_Backend/uploads'   # 서버 안에 파일이 저장될 폴더
+# ✅ ⛔️ 여기 있던 file.upload-dir 블록은 제거함
+# file:
+#   upload-dir: ./uploads
 
 ####################################
 # Papago API

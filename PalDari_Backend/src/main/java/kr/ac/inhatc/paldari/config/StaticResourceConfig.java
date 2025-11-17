@@ -7,7 +7,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class StaticResourceConfig implements WebMvcConfigurer {
-    @Value("${file.upload-dir}")
+
+    // ✅ app.upload-dir 로 교체
+    @Value("${app.upload-dir}")
     private String uploadDir;
 
     @Override

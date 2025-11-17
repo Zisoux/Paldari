@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/pal_bottom_nav.dart';
+import '../services/api.dart';
 
 class MyPageScreen extends StatefulWidget {
   const MyPageScreen({super.key});
@@ -11,26 +12,86 @@ class MyPageScreen extends StatefulWidget {
 }
 
 class _MyPageScreenState extends State<MyPageScreen> {
-  final _tagController = TextEditingController();
-  final _regionController = TextEditingController();
+  final ApiService _api = ApiService();
+
+  // ⭐ 평점 요약 상태
+  bool _ratingLoading = true;
+  String? _ratingError;
+  double _ratingAverage = 0.0;
+  int _ratingTotalCount = 0;
+  int _count1 = 0;
+  int _count2 = 0;
+  int _count3 = 0;
+  int _count4 = 0;
+  int _count5 = 0;
+
+  // ✅ EditProfileScreen과 동일하게 태그 코드 → 라벨 매핑
+  static const Map<String, String> _tagOptions = {
+    'LIFE': '생활',
+    'STUDY': '학업',
+    'REGION': '지역',
+    'JOB': '취업',
+    'SAFETY': '안전',
+  };
 
   @override
   void initState() {
     super.initState();
-    // 화면 진입 시 태그/지역 최신화 (조용히 실패 무시)
-    // addPostFrameCallback 써서 빌드 전에 read 에러 안 나게
+    // 화면 진입 시 태그/지역 + 평점 요약 로딩
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthState>();
       auth.reloadTags();
       auth.reloadRegions();
+      _loadRatingSummary();
     });
   }
 
-  @override
-  void dispose() {
-    _tagController.dispose();
-    _regionController.dispose();
-    super.dispose();
+  Future<void> _loadRatingSummary() async {
+    setState(() {
+      _ratingLoading = true;
+      _ratingError = null;
+    });
+
+    try {
+      final data = await _api.fetchMyRatingSummary();
+
+      final avg = (data['average'] as num?)?.toDouble() ?? 0.0;
+      final total = (data['totalCount'] as num?)?.toInt() ?? 0;
+
+      setState(() {
+        _ratingAverage = avg;
+        _ratingTotalCount = total;
+        _count1 = (data['count1'] as num?)?.toInt() ?? 0;
+        _count2 = (data['count2'] as num?)?.toInt() ?? 0;
+        _count3 = (data['count3'] as num?)?.toInt() ?? 0;
+        _count4 = (data['count4'] as num?)?.toInt() ?? 0;
+        _count5 = (data['count5'] as num?)?.toInt() ?? 0;
+        _ratingLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _ratingError = '평점을 불러오지 못했습니다.';
+        _ratingLoading = false;
+      });
+    }
+  }
+
+  // 태그 코드/라벨 섞여 있어도 항상 한글 라벨로 보여주기
+  String _displayTagLabel(String raw) {
+    // 코드(LIFE 등)로 온 경우
+    if (_tagOptions.containsKey(raw)) {
+      return _tagOptions[raw]!;
+    }
+    // 이미 라벨(생활 등)로 온 경우도 그대로 허용
+    final found = _tagOptions.entries.firstWhere(
+          (e) => e.value == raw,
+      orElse: () => const MapEntry('', ''),
+    );
+    if (found.key.isNotEmpty) {
+      return found.value;
+    }
+    // 매핑 안 되면 원문 그대로 노출
+    return raw;
   }
 
   @override
@@ -40,8 +101,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
     final username = (auth.profile?['username'] as String?) ?? 'User';
     final email = (auth.profile?['email'] as String?) ?? '';
-    final initial =
-    username.isNotEmpty ? username[0].toUpperCase() : 'U';
+    final initial = username.isNotEmpty ? username[0].toUpperCase() : 'U';
 
     // 혹시라도 auth.tags / regions 가 null인 구현이 남아있다면 방어
     final List<String> tags =
@@ -69,15 +129,14 @@ class _MyPageScreenState extends State<MyPageScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final double contentWidth =
-            constraints.maxWidth > maxContentWidth
+            final double contentWidth = constraints.maxWidth > maxContentWidth
                 ? maxContentWidth
                 : constraints.maxWidth;
 
             return Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 16),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: contentWidth),
                   child: Column(
@@ -138,15 +197,15 @@ class _MyPageScreenState extends State<MyPageScreen> {
                                 const SizedBox(height: 6),
                                 GestureDetector(
                                   onTap: () {
-                                    Navigator.pushNamed(context, '/editProfile');
+                                    Navigator.pushNamed(
+                                        context, '/editProfile');
                                   },
                                   child: Text(
                                     '내 정보 수정',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.black.withOpacity(0.5),
-                                      decoration:
-                                      TextDecoration.underline,
+                                      decoration: TextDecoration.underline,
                                     ),
                                   ),
                                 ),
@@ -155,8 +214,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                           ),
                           IconButton(
                             onPressed: () {
-                              Navigator.pushNamed(
-                                  context, '/settings');
+                              Navigator.pushNamed(context, '/settings');
                             },
                             icon: const Icon(
                               Icons.settings_outlined,
@@ -168,59 +226,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
                       const SizedBox(height: 24),
 
-                      // 평점 카드 (목업)
-                      const _SectionCard(
-                        title: '평점',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '5.0',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Text(
-                                  '/ 5',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  '(18)',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black45,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 12),
-                            _RatingBarRow(
-                                star: 5, count: 18, ratio: 1.0),
-                            _RatingBarRow(
-                                star: 4, count: 0, ratio: 0.0),
-                            _RatingBarRow(
-                                star: 3, count: 0, ratio: 0.0),
-                            _RatingBarRow(
-                                star: 2, count: 0, ratio: 0.0),
-                            _RatingBarRow(
-                                star: 1, count: 0, ratio: 0.0),
-                          ],
-                        ),
-                      ),
+                      // ⭐ 실제 평점 카드 (API 연동)
+                      _buildRatingSection(),
 
                       const SizedBox(height: 16),
 
-                      // 태그 카드
+                      // 태그 카드 (표시 전용)
                       _SectionCard(
                         title: '태그',
                         trailing: Text(
@@ -230,28 +241,21 @@ class _MyPageScreenState extends State<MyPageScreen> {
                             color: Colors.black54,
                           ),
                         ),
-                        child: Wrap(
+                        child: tags.isEmpty
+                            ? const Text(
+                          '설정된 태그가 없습니다.\n"내 정보 수정" 에서 관심 태그를 선택해 주세요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        )
+                            : Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
                             for (final t in tags)
                               _TagChip(
-                                label: t,
-                                onDelete: () => context
-                                    .read<AuthState>()
-                                    .removeTag(t),
-                              ),
-                            if (tags.length < 5)
-                              _AddChip(
-                                hint: '#태그 추가',
-                                controller: _tagController,
-                                onSubmitted: (text) async {
-                                  final v = text.trim();
-                                  if (v.isEmpty) return;
-                                  await context
-                                      .read<AuthState>()
-                                      .addTag(v);
-                                },
+                                label: _displayTagLabel(t),
                               ),
                           ],
                         ),
@@ -259,7 +263,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
 
                       const SizedBox(height: 16),
 
-                      // 지역 카드
+                      // 지역 카드 (표시 전용)
                       _SectionCard(
                         title: '지역',
                         trailing: Text(
@@ -269,28 +273,22 @@ class _MyPageScreenState extends State<MyPageScreen> {
                             color: Colors.black54,
                           ),
                         ),
-                        child: Wrap(
+                        child: regions.isEmpty
+                            ? const Text(
+                          '설정된 지역이 없습니다.\n"내 정보 수정" 에서 활동 지역을 선택해 주세요.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        )
+                            : Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
                             for (final r in regions)
                               _TagChip(
+                                // 지역은 라벨 그대로 저장/표시
                                 label: r,
-                                onDelete: () => context
-                                    .read<AuthState>()
-                                    .removeRegion(r),
-                              ),
-                            if (regions.length < 5)
-                              _AddChip(
-                                hint: '#지역 추가',
-                                controller: _regionController,
-                                onSubmitted: (text) async {
-                                  final v = text.trim();
-                                  if (v.isEmpty) return;
-                                  await context
-                                      .read<AuthState>()
-                                      .addRegion(v);
-                                },
                               ),
                           ],
                         ),
@@ -304,6 +302,116 @@ class _MyPageScreenState extends State<MyPageScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  // ⭐ 평점 섹션 위젯 (API 값 기반)
+  Widget _buildRatingSection() {
+    if (_ratingLoading) {
+      return const _SectionCard(
+        title: '평점',
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (_ratingError != null) {
+      return _SectionCard(
+        title: '평점',
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            _ratingError!,
+            style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+          ),
+        ),
+      );
+    }
+
+    // 총 개수 0이면 "아직 받은 평점이 없습니다" 표시
+    if (_ratingTotalCount == 0) {
+      return const _SectionCard(
+        title: '평점',
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text(
+            '아직 받은 평점이 없습니다.',
+            style: TextStyle(fontSize: 13, color: Colors.black54),
+          ),
+        ),
+      );
+    }
+
+    double ratio(int count) {
+      if (_ratingTotalCount == 0) return 0.0;
+      return count / _ratingTotalCount;
+    }
+
+    return _SectionCard(
+      title: '평점',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _ratingAverage.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                '/ 5',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '($_ratingTotalCount)',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black45,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _RatingBarRow(
+            star: 5,
+            count: _count5,
+            ratio: ratio(_count5),
+          ),
+          _RatingBarRow(
+            star: 4,
+            count: _count4,
+            ratio: ratio(_count4),
+          ),
+          _RatingBarRow(
+            star: 3,
+            count: _count3,
+            ratio: ratio(_count3),
+          ),
+          _RatingBarRow(
+            star: 2,
+            count: _count2,
+            ratio: ratio(_count2),
+          ),
+          _RatingBarRow(
+            star: 1,
+            count: _count1,
+            ratio: ratio(_count1),
+          ),
+        ],
       ),
     );
   }
@@ -329,8 +437,7 @@ class _SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -359,14 +466,12 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-// 태그 칩
+// 태그/지역 칩 (표시 전용)
 class _TagChip extends StatelessWidget {
   final String label;
-  final VoidCallback onDelete;
 
   const _TagChip({
     required this.label,
-    required this.onDelete,
   });
 
   @override
@@ -384,73 +489,11 @@ class _TagChip extends StatelessWidget {
           width: 0.6,
         ),
       ),
-      deleteIcon: const Icon(Icons.close, size: 14),
-      onDeleted: onDelete,
     );
   }
 }
 
-// 입력 칩 (엔터 + 플러스 둘 다 동작)
-class _AddChip extends StatelessWidget {
-  final String hint;
-  final TextEditingController controller;
-  final Future<void> Function(String) onSubmitted;
-
-  const _AddChip({
-    required this.hint,
-    required this.controller,
-    required this.onSubmitted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.black.withOpacity(0.2),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 90,
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: hint,
-                border: InputBorder.none,
-              ),
-              style: const TextStyle(fontSize: 11),
-              onSubmitted: (v) async {
-                final text = v.trim();
-                if (text.isEmpty) return;
-                await onSubmitted(text);
-                controller.clear();
-              },
-            ),
-          ),
-          InkWell(
-            child: const Icon(Icons.add, size: 16),
-            onTap: () async {
-              final text = controller.text.trim();
-              if (text.isEmpty) return;
-              await onSubmitted(text);
-              controller.clear();
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// 평점 바 (목업)
+// 평점 바
 class _RatingBarRow extends StatelessWidget {
   final int star;
   final int count;
@@ -465,8 +508,7 @@ class _RatingBarRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-      const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
           Text(

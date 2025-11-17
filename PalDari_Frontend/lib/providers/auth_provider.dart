@@ -520,7 +520,7 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  // ===== Profile Basic (gender, birthdate, country, livingIn, language, introduction) =====
+  // ===== Profile Basic (gender, birthdate, country, livingIn, language, introduction, tags, regions) =====
 
   Future<Map<String, dynamic>?> fetchProfileBasic() async {
     if (!isLoggedIn) return null;
@@ -545,6 +545,8 @@ class AuthState with ChangeNotifier {
     String? livingIn,
     String? language,
     String? introduction,
+    List<String>? tags,      // 🔹 태그: 코드 (예: LIFE, STUDY)
+    List<String>? regions,   // 🔹 지역: 라벨 문자열 (예: "Seoul", "Paris")
   }) async {
     if (!isLoggedIn) return false;
 
@@ -560,6 +562,10 @@ class AuthState with ChangeNotifier {
     if (livingIn != null) payload['livingIn'] = livingIn;
     if (language != null) payload['language'] = language;
     if (introduction != null) payload['introduction'] = introduction;
+
+    // 🔹 태그 / 지역도 같이 보냄 (백엔드 DTO에 맞게 필드명 사용)
+    if (tags != null) payload['tags'] = tags;
+    if (regions != null) payload['regions'] = regions;
 
     if (payload.isEmpty) return true;
 
@@ -578,7 +584,6 @@ class AuthState with ChangeNotifier {
     }
   }
 
-
   // ===== Tags =====
 
   Future<void> reloadTags({bool silent = false}) async {
@@ -590,13 +595,20 @@ class AuthState with ChangeNotifier {
     try {
       final res = await _api.dio.get('/api/profile/tags');
       final data = res.data;
+
+      // 🔥 항상 List<String>으로 강제 캐스팅
       if (data is Map && data['items'] is List) {
-        _tags = List<String>.from(data['items'] as List);
+        _tags = (data['items'] as List)
+            .map((e) => e.toString())
+            .toList();
       } else if (data is List) {
-        _tags = List<String>.from(data);
+        _tags = (data as List)
+            .map((e) => e.toString())
+            .toList();
       } else {
         _tags = const <String>[];
       }
+
       if (!silent) notifyListeners();
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
@@ -626,7 +638,9 @@ class AuthState with ChangeNotifier {
       );
       final data = res.data;
       if (data is Map && data['items'] is List) {
-        _tags = List<String>.from(data['items'] as List);
+        _tags = (data['items'] as List)
+            .map((e) => e.toString())
+            .toList();
       }
       notifyListeners();
     } catch (e) {
@@ -643,7 +657,9 @@ class AuthState with ChangeNotifier {
       );
       final data = res.data;
       if (data is Map && data['items'] is List) {
-        _tags = List<String>.from(data['items'] as List);
+        _tags = (data['items'] as List)
+            .map((e) => e.toString())
+            .toList();
       }
       notifyListeners();
     } catch (e) {
@@ -662,13 +678,20 @@ class AuthState with ChangeNotifier {
     try {
       final res = await _api.dio.get('/api/profile/regions');
       final data = res.data;
+
+      // 🔥 항상 List<String>으로 강제 캐스팅
       if (data is Map && data['items'] is List) {
-        _regions = List<String>.from(data['items'] as List);
+        _regions = (data['items'] as List)
+            .map((e) => e.toString())
+            .toList();
       } else if (data is List) {
-        _regions = List<String>.from(data);
+        _regions = (data as List)
+            .map((e) => e.toString())
+            .toList();
       } else {
         _regions = const <String>[];
       }
+
       if (!silent) notifyListeners();
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
@@ -698,7 +721,9 @@ class AuthState with ChangeNotifier {
       );
       final data = res.data;
       if (data is Map && data['items'] is List) {
-        _regions = List<String>.from(data['items'] as List);
+        _regions = (data['items'] as List)
+            .map((e) => e.toString())
+            .toList();
       }
       notifyListeners();
     } catch (e) {
@@ -715,7 +740,9 @@ class AuthState with ChangeNotifier {
       );
       final data = res.data;
       if (data is Map && data['items'] is List) {
-        _regions = List<String>.from(data['items'] as List);
+        _regions = (data['items'] as List)
+            .map((e) => e.toString())
+            .toList();
       }
       notifyListeners();
     } catch (e) {

@@ -2,8 +2,11 @@ package kr.ac.inhatc.paldari.auth.controller;
 
 import kr.ac.inhatc.paldari.auth.dto.ProfileBasicDto;
 import kr.ac.inhatc.paldari.auth.dto.UpdateProfileBasicRequest;
-import kr.ac.inhatc.paldari.auth.service.UserProfileService;
+import kr.ac.inhatc.paldari.auth.entity.User;
 import kr.ac.inhatc.paldari.auth.repository.UserRepository;
+import kr.ac.inhatc.paldari.auth.service.UserProfileService;
+import kr.ac.inhatc.paldari.rating.domain.RatingService;
+import kr.ac.inhatc.paldari.rating.web.dto.RatingSummaryDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +23,28 @@ import java.util.Map;
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
-    private final UserRepository userRepository; // (선택) 존재 확인 등 필요시 사용
+    private final UserRepository userRepository;   // 존재 확인용
+    private final RatingService ratingService;     // ⭐ 평점 요약용
 
     private String username(Principal principal) {
         if (principal == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
         }
         return principal.getName();
+    }
+
+    // ========== Rating Summary ==========
+
+    /** 내 평점 요약 조회 */
+    @GetMapping("/rating-summary")
+    public RatingSummaryDto getMyRatingSummary(Principal principal) {
+        String uname = username(principal);
+
+        User u = userRepository.findByUsername(uname)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        // buddyId = User.id 기준으로 요약 조회
+        return ratingService.getSummaryForBuddy(u.getId());
     }
 
     // ========== Settings ==========

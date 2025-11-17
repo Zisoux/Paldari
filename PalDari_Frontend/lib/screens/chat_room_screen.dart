@@ -8,6 +8,7 @@ import '../config.dart';
 import '../providers/auth_provider.dart';
 import '../services/api.dart'; // 번역용 ApiService 사용
 import 'chat_list_screen.dart'; // 👈 뒤로가기 시 채팅방 리스트로 이동
+import 'buddy_rating_screen.dart'; // ⭐ 버디 평가 화면
 
 class ChatRoomScreen extends StatefulWidget {
   final int roomId;
@@ -57,8 +58,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   StompClient? _stompClient;
   bool _connected = false;
 
-  bool _translateEnabled = true; // 실시간 번역 on/off 상태
-  bool _showTranslatePanel = false; // 패널 표시 여부
+  bool _translateEnabled = true;      // 실시간 번역 on/off 상태
+  bool _showTranslatePanel = false;   // 패널 표시 여부 (오른쪽 상단 버튼으로 토글)
 
   final List<ChatMessageDto> _messages = [];
   final TextEditingController _controller = TextEditingController();
@@ -97,10 +98,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
 
+        // JSArray 혹은 다른 List-like 객체가 올 수 있으니 안전하게 List<dynamic>으로 변환
         final List<dynamic> rawList =
         decoded is List ? List<dynamic>.from(decoded) : [];
 
         final history = rawList.map((e) {
+          // 요소가 JS 객체거나 dynamic일 수 있으니 Map<String, dynamic>으로 안전 변환
           final Map<String, dynamic> map = e is Map
               ? Map<String, dynamic>.from(e as Map)
               : (e is String
@@ -197,6 +200,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       callback: (frame) {
         if (frame.body == null) return;
 
+        // 1) JSON 파싱을 안전하게 처리
         Map<String, dynamic> data;
         try {
           final decoded = jsonDecode(frame.body!);
@@ -208,6 +212,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
+        // 2) DTO 변환 (예외 처리)
         ChatMessageDto msg;
         try {
           msg = ChatMessageDto.fromJson(data);
@@ -216,9 +221,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
+        // 3) UI 갱신은 프레임 콜백으로 안전하게 연기하고 mounted 재확인
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          _handleIncomingMessage(msg);
+          try {
+            setState(() {
+              _messages.add(msg);
+            });
+          } catch (e, st) {
+            debugPrint('stomp setState error: $e\n$st');
+          }
         });
       },
     );
@@ -283,7 +295,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         'type': 'TALK',
         'roomId': widget.roomId.toString(),
         'content': text,
+        // 나중에 _translateEnabled 서버로 넘기고 싶으면 같이 전송
       }),
+    );
+  }
+
+  // ---------- 버디 평가 화면 이동 ----------
+  void _openRatingScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuddyRatingScreen(
+          // TODO: 지금은 임시로 roomId/roomName 기반 값 사용
+          // 실제로는 채팅 상대의 userId, 프로필 이미지, 태그 리스트를
+          // ChatRoomScreen 생성자에서 받아와서 넘겨줘야 한다.
+          buddyId: widget.roomId,          // 🔥 임시: 실제 buddyId로 바꾸기
+          chatRoomId: widget.roomId,
+          buddyName: widget.roomName,
+          buddyImageUrl: '',               // 🔥 임시: 상대 프로필 URL
+          tags: const [],                  // 🔥 임시: 태그 리스트
+        ),
+      ),
     );
   }
 
@@ -293,9 +325,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     try {
       final dt = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
-      if (dt.year == now.year &&
-          dt.month == now.month &&
-          dt.day == now.day) {
+      // 같은 날이면 HH:mm, 아니면 M/d HH:mm 정도
+      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
         final hh = dt.hour.toString().padLeft(2, '0');
         final mm = dt.minute.toString().padLeft(2, '0');
         return '$hh:$mm';
@@ -542,6 +573,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
           const Spacer(),
+          // ⭐ 버디 평가 버튼
+          IconButton(
+            icon: const Icon(
+              Icons.star_rate_rounded,
+              color: Color(0xFFFAAD55),
+              size: 24,
+            ),
+            tooltip: '버디 평가하기',
+            onPressed: _openRatingScreen,
+          ),
+          // 실시간 번역 설정 토글 버튼 (패널 열기/닫기)
           IconButton(
             icon: const Icon(
               Icons.translate,
@@ -611,6 +653,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
         child: Row(
           children: [
+            // "+" 버튼
             GestureDetector(
               onTap: () {
                 // TODO: 파일/이미지/기능 추가
@@ -629,6 +672,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
             ),
             const SizedBox(width: 6),
+            // 인풋 박스
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -660,6 +704,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
             ),
             const SizedBox(width: 6),
+            // 보내기 버튼
             GestureDetector(
               onTap: _send,
               child: Container(

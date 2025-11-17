@@ -28,21 +28,23 @@ class ApiService {
 
         // 2) 401 나오면 refresh 시도 후 한 번 재시도
         onError: (e, handler) async {
+          // 이미 한 번 재시도했던 요청이면 바로 종료 (무한 루프 방지)
           final isRetry = e.requestOptions.extra['__retry'] == true;
 
           if (e.response?.statusCode == 401 && !isRetry) {
             final refreshToken = await _storage.readRefreshToken();
             if (refreshToken == null || refreshToken.isEmpty) {
-              return handler.next(e);
+              return handler.next(e); // 리프레시도 없으면 그냥 실패
             }
 
             try {
+              // refresh 요청
               final refreshRes = await _dio.post(
                 '/api/auth/refresh',
                 data: {'refreshToken': refreshToken},
                 options: Options(
                   headers: {
-                    'Authorization': null,
+                    'Authorization': null, // 기존 토큰 헤더 제거
                   },
                 ),
               );
@@ -57,6 +59,7 @@ class ApiService {
                   refreshToken: newRefresh ?? refreshToken,
                 );
 
+                // 원래 요청 복구해서 재시도
                 final opts = e.requestOptions;
                 opts.headers['Authorization'] = 'Bearer $newAccess';
                 opts.extra['__retry'] = true;
@@ -65,6 +68,7 @@ class ApiService {
                 return handler.resolve(cloneResponse);
               }
             } catch (_) {
+              // refresh 실패시 -> 토큰 삭제하고 그냥 401 흘려보냄
               await _storage.deleteTokens();
             }
           }
@@ -139,9 +143,9 @@ class ApiService {
     required String content,
     String? country,
     String? category,
-    String? language,
-    bool? isForeigner,
-    String? persona,
+    String? language, // 🔹 추가
+    bool? isForeigner, // 🔹 추가
+    String? persona, // 🔹 추가
   }) async {
     final body = <String, dynamic>{
       'title': title,
@@ -163,7 +167,7 @@ class ApiService {
     );
   }
 
-  /// 게시글 수정
+  /// 게시글 수정 (제목/내용/국가/카테고리/언어/내외국인/페르소나)
   Future<Map<String, dynamic>> updatePost({
     required int id,
     required String title,
@@ -203,7 +207,7 @@ class ApiService {
     }
   }
 
-  /// 첨부파일 삭제
+  /// 🔥 첨부파일 삭제 (작성자 본인만 가능)
   Future<void> deleteAttachment(int postId, int attachmentId) async {
     final res = await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
     if (res.statusCode != 204 && res.statusCode != 200) {
@@ -213,7 +217,7 @@ class ApiService {
     }
   }
 
-  // ========== COMMENTS ==========
+  // ========== COMMENTS (백엔드 없으면 404 나도 안전하게 처리) ==========
 
   Future<List<Map<String, dynamic>>> fetchComments(int postId) async {
     try {
@@ -228,6 +232,7 @@ class ApiService {
       }
       return [];
     } on DioException catch (e) {
+      // 댓글 API 아직 없으면(404) 그냥 빈 리스트
       if (e.response?.statusCode == 404) return [];
       rethrow;
     }
@@ -466,6 +471,56 @@ class ApiService {
       text: text,
       sourceLang: detected,
       targetLang: targetLang,
+    );
+  }
+  // ========== RATINGS ==========
+
+  /// 채팅방에서 Buddy 평점 남기기
+  ///
+  /// 백엔드 `POST /api/ratings` 와 연결됨.
+  /// - buddyId : 평가 받을 사람의 memberId
+  /// - chatRoomId : 어떤 채팅방/매칭에 대한 평가인지
+  /// - score : 1 ~ 5
+  /// - comment : 선택 사항 (null 또는 빈 문자열이면 전송 안 함)
+  Future<void> submitRating({
+    required int buddyId,
+    required int chatRoomId,
+    required int score,
+    String? comment,
+  }) async {
+    final body = <String, dynamic>{
+      'buddyId': buddyId,
+      'chatRoomId': chatRoomId,
+      'score': score,
+      if (comment != null && comment.isNotEmpty) 'comment': comment,
+    };
+
+    final res = await _dio.post('/api/ratings', data: body);
+
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(
+        'Failed to submit rating: ${res.statusCode} ${res.statusMessage}',
+      );
+    }
+  }
+
+  /// 마이페이지용: 내가 받은 평점 요약 조회
+  ///
+  /// GET /api/profile/rating-summary
+  /// -> { average, totalCount, count1, ..., count5 }
+  Future<Map<String, dynamic>> fetchMyRatingSummary() async {
+    final res = await _dio.get('/api/profile/rating-summary');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected rating summary response format');
+    }
+
+    throw Exception(
+      'Failed to load rating summary: ${res.statusCode} ${res.statusMessage}',
     );
   }
 }
