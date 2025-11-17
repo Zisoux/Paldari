@@ -80,6 +80,8 @@ public class SecurityConfig {
                         .requestMatchers("/ws-chat/**").permitAll()
                         // 게시글 조회는 공개
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
+                        // 매칭 기능 인증 필요
+                        .requestMatchers("/api/matching/**").authenticated()
                         // 글쓰기/수정/삭제는 인증 필요
                         .requestMatchers("/api/posts/**").authenticated()
                         // 채팅 API는 인증 필요

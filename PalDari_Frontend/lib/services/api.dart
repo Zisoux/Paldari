@@ -28,23 +28,21 @@ class ApiService {
 
         // 2) 401 나오면 refresh 시도 후 한 번 재시도
         onError: (e, handler) async {
-          // 이미 한 번 재시도했던 요청이면 바로 종료 (무한 루프 방지)
           final isRetry = e.requestOptions.extra['__retry'] == true;
 
           if (e.response?.statusCode == 401 && !isRetry) {
             final refreshToken = await _storage.readRefreshToken();
             if (refreshToken == null || refreshToken.isEmpty) {
-              return handler.next(e); // 리프레시도 없으면 그냥 실패
+              return handler.next(e);
             }
 
             try {
-              // refresh 요청
               final refreshRes = await _dio.post(
                 '/api/auth/refresh',
                 data: {'refreshToken': refreshToken},
                 options: Options(
                   headers: {
-                    'Authorization': null, // 기존 토큰 헤더 제거
+                    'Authorization': null,
                   },
                 ),
               );
@@ -59,7 +57,6 @@ class ApiService {
                   refreshToken: newRefresh ?? refreshToken,
                 );
 
-                // 원래 요청 복구해서 재시도
                 final opts = e.requestOptions;
                 opts.headers['Authorization'] = 'Bearer $newAccess';
                 opts.extra['__retry'] = true;
@@ -68,7 +65,6 @@ class ApiService {
                 return handler.resolve(cloneResponse);
               }
             } catch (_) {
-              // refresh 실패시 -> 토큰 삭제하고 그냥 401 흘려보냄
               await _storage.deleteTokens();
             }
           }
@@ -93,7 +89,8 @@ class ApiService {
       throw Exception('Unexpected posts response format');
     }
     throw Exception(
-        'Failed to load posts: ${res.statusCode} ${res.statusMessage}');
+      'Failed to load posts: ${res.statusCode} ${res.statusMessage}',
+    );
   }
 
   Future<Map<String, dynamic>> fetchPost(int id) async {
@@ -109,22 +106,15 @@ class ApiService {
     );
   }
 
-  /// 언어/내외국인까지 지원하도록 확장된 게시글 생성
-  ///
-  /// 백엔드 DTO가 아래 키들을 받아야 저장됨:
-  /// - country (String)
-  /// - category (String)
-  /// - language (String)
-  /// - isForeigner (bool)  // 불린 규격 선택 시
-  /// - persona (String)    // 텍스트 규격 선택 시 ('내국인' | '외국인')
+  /// 게시글 생성 (국가/카테고리/언어/내외국인/페르소나 포함)
   Future<Map<String, dynamic>> createPost({
     required String title,
     required String content,
     String? country,
     String? category,
-    String? language, // 🔹 추가
-    bool? isForeigner, // 🔹 추가
-    String? persona, // 🔹 추가
+    String? language,
+    bool? isForeigner,
+    String? persona,
   }) async {
     final body = <String, dynamic>{
       'title': title,
@@ -142,10 +132,11 @@ class ApiService {
       return Map<String, dynamic>.from(res.data as Map);
     }
     throw Exception(
-        'Failed to create post: ${res.statusCode} ${res.statusMessage}');
+      'Failed to create post: ${res.statusCode} ${res.statusMessage}',
+    );
   }
 
-  /// 게시글 수정 (제목/내용/국가/카테고리/언어/내외국인/페르소나)
+  /// 게시글 수정
   Future<Map<String, dynamic>> updatePost({
     required int id,
     required String title,
@@ -172,21 +163,22 @@ class ApiService {
       return Map<String, dynamic>.from(res.data as Map);
     }
     throw Exception(
-        'Failed to update post: ${res.statusCode} ${res.statusMessage}');
+      'Failed to update post: ${res.statusCode} ${res.statusMessage}',
+    );
   }
 
   Future<void> deletePost(int id) async {
     final res = await _dio.delete('/api/posts/$id');
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw Exception(
-          'Failed to delete post: ${res.statusCode} ${res.statusMessage}');
+        'Failed to delete post: ${res.statusCode} ${res.statusMessage}',
+      );
     }
   }
 
-  /// 🔥 첨부파일 삭제 (작성자 본인만 가능)
+  /// 첨부파일 삭제
   Future<void> deleteAttachment(int postId, int attachmentId) async {
-    final res =
-    await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
+    final res = await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw Exception(
         'Failed to delete attachment: ${res.statusCode} ${res.statusMessage}',
@@ -194,7 +186,7 @@ class ApiService {
     }
   }
 
-  // ========== COMMENTS (백엔드 없으면 404 나도 안전하게 처리) ==========
+  // ========== COMMENTS ==========
 
   Future<List<Map<String, dynamic>>> fetchComments(int postId) async {
     try {
@@ -209,7 +201,6 @@ class ApiService {
       }
       return [];
     } on DioException catch (e) {
-      // 댓글 API 아직 없으면(404) 그냥 빈 리스트
       if (e.response?.statusCode == 404) return [];
       rethrow;
     }
@@ -246,12 +237,148 @@ class ApiService {
     }
   }
 
+  // ========== MATCHING (조건 매칭 / 랜덤 매칭 / 채팅 생성) ==========
+
+  /// (1) 조건에 맞는 Pal 리스트 전체
+  ///
+  /// GET /api/matching/candidates
+  /// 쿼리 예시:
+  ///   ?nationality=일본&category=생활&region=서울&gender=여성&minAge=20&maxAge=30
+  Future<List<Map<String, dynamic>>> fetchMatchingCandidates({
+    String? nationality, // BUDDY 국적
+    String? category, // 카테고리
+    String? region, // 상세 지역
+    String? gender, // "남성" / "여성" / "무관"
+    int? minAge,
+    int? maxAge,
+  }) async {
+    final query = <String, dynamic>{};
+
+    if (nationality != null && nationality.isNotEmpty) {
+      query['nationality'] = nationality;
+    }
+    if (category != null && category.isNotEmpty) {
+      query['category'] = category;
+    }
+    if (region != null && region.isNotEmpty) {
+      query['region'] = region;
+    }
+    if (gender != null && gender.isNotEmpty && gender != '무관') {
+      query['gender'] = gender;
+    }
+    if (minAge != null) query['minAge'] = minAge;
+    if (maxAge != null) query['maxAge'] = maxAge;
+
+    final res = await _dio.get(
+      '/api/matching/candidates',
+      queryParameters: query.isEmpty ? null : query,
+    );
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is List) {
+        return data
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      throw Exception('Unexpected matching response format: ${res.data}');
+    }
+
+    if (res.statusCode == 204 || res.statusCode == 404) {
+      return [];
+    }
+
+    throw Exception(
+      'Failed to load candidates: ${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
+  /// (1-1) 조건에 맞는 Pal 중 "가장 우선순위 높은 1명"만 가져오기
+  ///
+  /// 지금은 단순히 첫 번째 후보를 선택.
+  Future<Map<String, dynamic>?> findBestMatch({
+    String? nationality,
+    String? category,
+    String? region,
+    String? gender,
+    int? minAge,
+    int? maxAge,
+  }) async {
+    final list = await fetchMatchingCandidates(
+      nationality: nationality,
+      category: category,
+      region: region,
+      gender: gender,
+      minAge: minAge,
+      maxAge: maxAge,
+    );
+
+    if (list.isEmpty) return null;
+    return list.first;
+  }
+
+  /// (2) 조건 없이 랜덤 Pal 1명
+  ///
+  /// GET /api/matching/random
+  /// 응답:
+  ///   200: { "id": 3, "username": "...", ... }
+  ///   204/404: 매칭 가능 유저 없음
+  Future<Map<String, dynamic>?> findRandomMatch() async {
+    final res = await _dio.get('/api/matching/random');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected random matching response format: $data');
+    }
+
+    if (res.statusCode == 204 || res.statusCode == 404) {
+      return null;
+    }
+
+    throw Exception(
+      'Failed to load random pal: ${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
+  /// 옛 이름 유지용 래퍼 (혹시 다른 곳에서 쓰고 있으면)
+  Future<Map<String, dynamic>?> fetchRandomPal() => findRandomMatch();
+
+  /// (3) 매칭된 유저와의 채팅방 생성 / 기존 방 조회
+  ///
+  /// POST /api/matching/chat
+  /// body: { "targetUserId": 3 }
+  ///
+  /// 응답:
+  ///   { "roomId": 10, "name": "...", "subText": "...", ... }
+  Future<Map<String, dynamic>> createChatForMatching({
+    required int targetUserId,
+  }) async {
+    final res = await _dio.post(
+      '/api/matching/chat',
+      data: {
+        'targetUserId': targetUserId,
+      },
+    );
+
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected createChatForMatching response: $data');
+    }
+
+    throw Exception(
+      'Failed to create chat room: ${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
   // ========== TRANSLATION (Papago via backend) ==========
 
   /// 언어 감지
-  /// 백엔드: POST /api/translate/detect
-  /// 요청: { "text": "..." }
-  /// 응답: { "langCode": "ko" }
   Future<String> detectLanguage(String text) async {
     final res = await _dio.post(
       '/api/translate/detect',
@@ -272,9 +399,6 @@ class ApiService {
   }
 
   /// 텍스트 번역
-  /// 백엔드: POST /api/translate/text
-  /// 요청: { "sourceLang": "ko", "targetLang": "en", "text": "안녕" }
-  /// 응답: { "translatedText": "Hello" }
   Future<String> translateText({
     required String text,
     required String sourceLang,
@@ -303,20 +427,14 @@ class ApiService {
   }
 
   /// 자동 번역 헬퍼
-  /// - 1) 언어 감지
-  /// - 2) targetLang과 같으면 원문 그대로 반환
-  /// - 3) 다르면 Papago 번역 호출
   Future<String> autoTranslate({
     required String text,
     required String targetLang,
   }) async {
-    // 1) 언어 감지
     final detected = await detectLanguage(text);
 
-    // 동일 언어면 번역 안 하고 원문 리턴
     if (detected == targetLang) return text;
 
-    // 2) 번역
     return translateText(
       text: text,
       sourceLang: detected,

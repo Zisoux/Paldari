@@ -62,6 +62,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
       );
 
+      debugPrint('GET /api/chat/rooms => ${res.statusCode} ${res.body}');
+
       if (res.statusCode == 200) {
         final List data = jsonDecode(res.body) as List;
         return data

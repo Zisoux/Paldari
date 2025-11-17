@@ -7,6 +7,7 @@ import 'package:stomp_dart_client/stomp_dart_client.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
 import '../services/api.dart'; // 번역용 ApiService 사용
+import 'chat_list_screen.dart'; // 👈 뒤로가기 시 채팅방 리스트로 이동
 
 class ChatRoomScreen extends StatefulWidget {
   final int roomId;
@@ -23,7 +24,7 @@ class ChatRoomScreen extends StatefulWidget {
 }
 
 class ChatMessageDto {
-  final String type;      // TALK / ENTER 등
+  final String type; // TALK / ENTER 등
   final String roomId;
   final String sender;
   final String content;
@@ -56,13 +57,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   StompClient? _stompClient;
   bool _connected = false;
 
-  bool _translateEnabled = true;      // 실시간 번역 on/off 상태
-  bool _showTranslatePanel = false;   // 패널 표시 여부 (오른쪽 상단 버튼으로 토글)
+  bool _translateEnabled = true; // 실시간 번역 on/off 상태
+  bool _showTranslatePanel = false; // 패널 표시 여부
 
   final List<ChatMessageDto> _messages = [];
   final TextEditingController _controller = TextEditingController();
 
-  final ApiService _api = ApiService(); // 🔹 공용 API 서비스
+  final ApiService _api = ApiService(); // 공용 API 서비스
 
   String get _roomTopic => '/topic/chatroom.${widget.roomId}';
 
@@ -96,16 +97,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
 
-        // JSArray 혹은 다른 List-like 객체가 올 수 있으니 안전하게 List<dynamic>으로 변환
-        final List<dynamic> rawList = decoded is List
-            ? List<dynamic>.from(decoded)
-            : [];
+        final List<dynamic> rawList =
+        decoded is List ? List<dynamic>.from(decoded) : [];
 
         final history = rawList.map((e) {
-          // 요소가 JS 객체거나 dynamic일 수 있으니 Map<String, dynamic>으로 안전 변환
           final Map<String, dynamic> map = e is Map
               ? Map<String, dynamic>.from(e as Map)
-              : (e is String ? jsonDecode(e) as Map<String, dynamic> : <String, dynamic>{});
+              : (e is String
+              ? jsonDecode(e) as Map<String, dynamic>
+              : <String, dynamic>{});
           return ChatMessageDto.fromJson(map);
         }).toList(growable: false);
 
@@ -116,7 +116,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ..addAll(history);
         });
 
-        // 🔹 옵션: 처음부터 번역 켜져 있으면 기존 메시지도 번역 시도
+        // 번역 토글이 켜져 있으면 기존 메시지도 번역 시도
         if (_translateEnabled) {
           _translateExistingMessages();
         }
@@ -128,7 +128,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  // 🔹 이미 로드된 메시지들을 번역 (토글 ON 시/최초 로딩 시 사용)
+  // 이미 로드된 메시지들을 번역
   Future<void> _translateExistingMessages() async {
     if (!_translateEnabled) return;
     if (!mounted) return;
@@ -136,14 +136,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final auth = context.read<AuthState>();
     final currentUser = auth.username ?? '';
 
-    // 사용자의 앱 언어를 target으로 사용 (ko / en ...)
     final locale = Localizations.localeOf(context);
     final targetLang = locale.languageCode;
 
     for (final m in _messages) {
-      if (m.type != 'TALK') continue;          // 입장 메시지 등은 제외
-      if (m.sender == currentUser) continue;   // 내 메시지는 번역 안해도 됨
-      if (m.translatedContent != null) continue; // 이미 번역된 건 패스
+      if (m.type != 'TALK') continue;
+      if (m.sender == currentUser) continue;
+      if (m.translatedContent != null) continue;
 
       try {
         final translated = await _api.autoTranslate(
@@ -152,7 +151,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         );
 
         if (!mounted) return;
-        if (translated == m.content) continue; // 같은 언어면 그대로
+        if (translated == m.content) continue;
 
         setState(() {
           m.translatedContent = translated;
@@ -198,7 +197,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       callback: (frame) {
         if (frame.body == null) return;
 
-        // 1) JSON 파싱을 안전하게 처리
         Map<String, dynamic> data;
         try {
           final decoded = jsonDecode(frame.body!);
@@ -210,7 +208,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
-        // 2) DTO 변환 (예외 처리)
         ChatMessageDto msg;
         try {
           msg = ChatMessageDto.fromJson(data);
@@ -219,10 +216,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
-        // 3) UI 갱신 + 필요시 번역
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          _handleIncomingMessage(msg); // 🔹 새 메시지 처리
+          _handleIncomingMessage(msg);
         });
       },
     );
@@ -237,25 +233,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
-  // 🔹 새로 도착한 메시지 처리 + 자동 번역
+  // 새로 도착한 메시지 처리 + 자동 번역
   Future<void> _handleIncomingMessage(ChatMessageDto msg) async {
     if (!mounted) return;
 
     final auth = context.read<AuthState>();
     final currentUser = auth.username ?? '';
 
-    // 1) 일단 메시지 추가해서 바로 보이게
     setState(() {
       _messages.add(msg);
     });
 
-    // TALK가 아니면 번역 안 함
     if (msg.type != 'TALK') return;
-
-    // 내 메시지는 굳이 번역 안 해도 됨 (원하면 이 조건 제거 가능)
     if (msg.sender == currentUser) return;
-
-    // 번역 토글이 꺼져 있으면 끝
     if (!_translateEnabled) return;
 
     try {
@@ -293,7 +283,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         'type': 'TALK',
         'roomId': widget.roomId.toString(),
         'content': text,
-        // 나중에 _translateEnabled 서버로 넘기고 싶으면 같이 전송
       }),
     );
   }
@@ -304,8 +293,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     try {
       final dt = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
-      // 같은 날이면 HH:mm, 아니면 M/d HH:mm 정도
-      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      if (dt.year == now.year &&
+          dt.month == now.month &&
+          dt.day == now.day) {
         final hh = dt.hour.toString().padLeft(2, '0');
         final mm = dt.minute.toString().padLeft(2, '0');
         return '$hh:$mm';
@@ -323,163 +313,175 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final auth = context.watch<AuthState>();
     final currentUser = auth.username ?? '';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFF7F1),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            if (_showTranslatePanel) _buildTranslateToggle(),
-            if (_showTranslatePanel) const SizedBox(height: 4),
-            Expanded(
-              child: ListView.builder(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final m = _messages[index];
-                  final isMe = m.sender == currentUser;
-                  final isEnter = m.type == 'ENTER';
+    return WillPopScope(
+      // 시스템 뒤로가기 → 무조건 채팅방 리스트
+      onWillPop: () async {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const ChatListScreen(),
+          ),
+        );
+        return false; // 기본 pop 막기
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFFF7F1),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              if (_showTranslatePanel) _buildTranslateToggle(),
+              if (_showTranslatePanel) const SizedBox(height: 4),
+              Expanded(
+                child: ListView.builder(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final m = _messages[index];
+                    final isMe = m.sender == currentUser;
+                    final isEnter = m.type == 'ENTER';
 
-                  if (isEnter) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Center(
-                        child: Text(
-                          m.content.isNotEmpty
-                              ? m.content
-                              : '${m.sender} joined the room',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.brown.withOpacity(0.5),
+                    if (isEnter) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Center(
+                          child: Text(
+                            m.content.isNotEmpty
+                                ? m.content
+                                : '${m.sender} joined the room',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.brown.withOpacity(0.5),
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }
-
-                  final timeText = _formatTime(m.sentAt);
-
-                  // 🔹 번역이 켜져 있고, 번역 결과가 있고, 내 메시지가 아니면
-                  //    번역문을 메인으로 보여주고, 원문은 작게 아래에 표시
-                  String mainText = m.content;
-                  String? originalSubText;
-
-                  if (_translateEnabled &&
-                      m.translatedContent != null &&
-                      !isMe) {
-                    mainText = m.translatedContent!;
-                    if (m.translatedContent != m.content) {
-                      originalSubText = m.content;
+                      );
                     }
-                  }
 
-                  return Align(
-                    alignment:
-                    isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Column(
-                      crossAxisAlignment: isMe
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isMe
-                                ? const Color(0xFFFAAD55) // 내 말풍선
-                                : Colors.white, // 상대 말풍선
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(10),
-                              topRight: const Radius.circular(10),
-                              bottomLeft: isMe
-                                  ? const Radius.circular(10)
-                                  : Radius.zero,
-                              bottomRight: isMe
-                                  ? Radius.zero
-                                  : const Radius.circular(10),
+                    final timeText = _formatTime(m.sentAt);
+
+                    String mainText = m.content;
+                    String? originalSubText;
+
+                    if (_translateEnabled &&
+                        m.translatedContent != null &&
+                        !isMe) {
+                      mainText = m.translatedContent!;
+                      if (m.translatedContent != m.content) {
+                        originalSubText = m.content;
+                      }
+                    }
+
+                    return Align(
+                      alignment:
+                      isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: isMe
+                            ? CrossAxisAlignment.end
+                            : CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 3,
-                                offset: const Offset(0, 1),
+                            decoration: BoxDecoration(
+                              color: isMe
+                                  ? const Color(0xFFFAAD55)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(10),
+                                topRight: const Radius.circular(10),
+                                bottomLeft: isMe
+                                    ? const Radius.circular(10)
+                                    : Radius.zero,
+                                bottomRight: isMe
+                                    ? Radius.zero
+                                    : const Radius.circular(10),
                               ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!isMe)
-                                Text(
-                                  m.sender,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color:
-                                    Colors.brown.withOpacity(0.6),
-                                  ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
                                 ),
-                              Text(
-                                mainText,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF260101),
-                                ),
-                              ),
-
-                              // 🔹 번역됨 표시: 토글 ON + 실제 번역됐고 내 메시지가 아닐 때만
-                              if (_translateEnabled &&
-                                  m.translatedContent != null &&
-                                  !isMe)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '번역됨',
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      color: Colors.brown
-                                          .withOpacity(0.5),
-                                    ),
-                                  ),
-                                ),
-
-                              if (originalSubText != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Text(
-                                    '원문: $originalSubText',
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (!isMe)
+                                  Text(
+                                    m.sender,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color: Colors.brown
-                                          .withOpacity(0.5),
+                                      color:
+                                      Colors.brown.withOpacity(0.6),
                                     ),
                                   ),
+                                Text(
+                                  mainText,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF260101),
+                                  ),
                                 ),
-                            ],
-                          ),
-                        ),
-                        if (timeText.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                                left: 4, right: 4, bottom: 2),
-                            child: Text(
-                              timeText,
-                              style: TextStyle(
-                                fontSize: 8,
-                                color:
-                                Colors.brown.withOpacity(0.5),
-                              ),
+                                if (_translateEnabled &&
+                                    m.translatedContent != null &&
+                                    !isMe)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      '번역됨',
+                                      style: TextStyle(
+                                        fontSize: 8,
+                                        color: Colors.brown
+                                            .withOpacity(0.5),
+                                      ),
+                                    ),
+                                  ),
+                                if (originalSubText != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      '원문: $originalSubText',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.brown
+                                            .withOpacity(0.5),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                      ],
-                    ),
-                  );
-                },
+                          if (timeText.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 4,
+                                right: 4,
+                                bottom: 2,
+                              ),
+                              child: Text(
+                                timeText,
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color:
+                                  Colors.brown.withOpacity(0.5),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            _buildInputArea(),
-          ],
+              _buildInputArea(),
+            ],
+          ),
         ),
       ),
     );
@@ -499,7 +501,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              // 상단 화살표 뒤로가기 → 무조건 채팅방 리스트로
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ChatListScreen(),
+                ),
+              );
+            },
             child: const Icon(
               Icons.arrow_back_ios,
               size: 20,
@@ -532,7 +542,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
           const Spacer(),
-          // 실시간 번역 설정 토글 버튼 (패널 열기/닫기)
           IconButton(
             icon: const Icon(
               Icons.translate,
@@ -586,10 +595,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   _translateEnabled = v;
                 });
                 if (v) {
-                  // 🔹 토글 켜질 때, 기존 메시지도 번역 시도
                   _translateExistingMessages();
                 }
-                // TODO: 서버와 sync 하고 싶다면 여기에서 API 호출
               },
             ),
           ],
@@ -604,7 +611,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
         child: Row(
           children: [
-            // "+" 버튼
             GestureDetector(
               onTap: () {
                 // TODO: 파일/이미지/기능 추가
@@ -623,7 +629,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            // 인풋 박스
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -655,7 +660,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            // 보내기 버튼
             GestureDetector(
               onTap: _send,
               child: Container(

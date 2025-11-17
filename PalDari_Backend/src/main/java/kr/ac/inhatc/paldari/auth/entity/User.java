@@ -7,6 +7,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -79,4 +83,16 @@ public class User {
         this.role = "ROLE_USER";
         this.created = LocalDateTime.now();
     }
+
+    // 🔹 유저의 지역 태그들 (#서울, #말레이시아 ...)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserRegion> regions = new HashSet<>();
+
+    // 🔹 유저의 관심/도움 태그들 (#생활, #학업 ...)
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserTag> tags = new HashSet<>();
+
+    // 🔹 유저 설정 (알람, 매칭 허용, 실시간 번역)
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    private UserSettings settings;
 }
