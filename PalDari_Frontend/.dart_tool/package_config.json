@@ -32,6 +32,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "cross_file",
+      "rootUri": "file:///Users/test/.pub-cache/hosted/pub.dev/cross_file-0.3.5",
+      "packageUri": "lib/",
+      "languageVersion": "3.7"
+    },
+    {
       "name": "cupertino_icons",
       "rootUri": "file:///Users/test/.pub-cache/hosted/pub.dev/cupertino_icons-1.0.8",
       "packageUri": "lib/",
@@ -68,6 +74,12 @@
       "languageVersion": "3.7"
     },
     {
+      "name": "file_picker",
+      "rootUri": "file:///Users/test/.pub-cache/hosted/pub.dev/file_picker-8.3.7",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "flutter",
       "rootUri": "file:///Users/test/development/flutter/packages/flutter",
       "packageUri": "lib/",
@@ -78,6 +90,12 @@
       "rootUri": "file:///Users/test/.pub-cache/hosted/pub.dev/flutter_lints-5.0.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
+    },
+    {
+      "name": "flutter_plugin_android_lifecycle",
+      "rootUri": "file:///Users/test/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.32",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
     },
     {
       "name": "flutter_secure_storage",

@@ -10,15 +10,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.2.1
+
+  # 네트워크
+  http: ^1.5.0           # ← 파일 업로드용 MultipartRequest 사용 (업데이트)
+  dio: ^5.5.0
+
+  # STOMP (실시간)
   stomp_dart_client: ^3.0.1
 
   # UI/상태
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
-
-  # 네트워크
-  dio: ^5.5.0
 
   # 외부 링크/브라우저 오픈
   url_launcher: ^6.3.0
@@ -28,6 +30,10 @@ dependencies:
 
   # OAuth(모바일/데스크탑용 콜백 스킴 처리)
   flutter_web_auth_2: ^4.1.0
+
+  # ⬇️ 파일 업로드용 (NewPostScreen에서 사용)
+  file_picker: ^8.0.0
+  http_parser: ^4.0.2
 
 dev_dependencies:
   flutter_test:

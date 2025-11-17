@@ -2,6 +2,8 @@ package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "posts")
@@ -44,6 +46,14 @@ public class Post {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // 🔹 첨부파일 컬렉션 (1 : N)
+    @OneToMany(
+            mappedBy = "post",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
+    )
+    private List<PostAttachment> attachments = new ArrayList<>();
 
     protected Post() {}
 
@@ -100,4 +110,23 @@ public class Post {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public List<PostAttachment> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<PostAttachment> attachments) {
+        this.attachments = attachments;
+    }
+
+    // 🔹 편의 메서드
+    public void addAttachment(PostAttachment attachment) {
+        attachments.add(attachment);
+        attachment.setPost(this);
+    }
+
+    public void removeAttachment(PostAttachment attachment) {
+        attachments.remove(attachment);
+        attachment.setPost(null);
+    }
 }

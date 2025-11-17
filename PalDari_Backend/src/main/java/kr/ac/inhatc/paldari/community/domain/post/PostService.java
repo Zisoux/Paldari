@@ -1,6 +1,8 @@
 package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.transaction.Transactional;
+import kr.ac.inhatc.paldari.community.web.dto.AttachmentDto;
+import kr.ac.inhatc.paldari.community.web.dto.PostDetailResponse;
 import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
 import kr.ac.inhatc.paldari.community.web.dto.PostResponse;
 import lombok.RequiredArgsConstructor;
@@ -35,12 +37,43 @@ public class PostService {
                 .map(this::toDto);
     }
 
+    // 🔹 기존 기본 조회 (필요하면 계속 사용)
     @Transactional(Transactional.TxType.SUPPORTS)
     public PostResponse get(Long id) {
         var p = repo.findById(id)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
         return toDto(p);
+    }
+
+    // 🔹 상세 조회: 첨부 + 메타데이터까지 포함
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public PostDetailResponse getDetail(Long id) {
+        var p = repo.findById(id)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Post not found: " + id));
+
+        var attachmentDtos = p.getAttachments()
+                .stream()
+                .map(a -> new AttachmentDto(
+                        a.getId(),
+                        a.getUrl(),
+                        a.getOriginalName()
+                ))
+                .toList();
+
+        return new PostDetailResponse(
+                p.getId(),
+                p.getTitle(),
+                p.getContent(),
+                p.getAuthorUsername(),
+                p.getCountry(),
+                p.getCategory(),
+                p.getLanguage(),
+                p.getIsForeigner(),
+                p.getPersona(),
+                attachmentDtos
+        );
     }
 
     // 생성: Principal(username) 사용

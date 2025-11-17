@@ -66,6 +66,26 @@ class AuthState with ChangeNotifier {
     return t.isEmpty ? null : t;
   }
 
+  /// (추가) 어디서든 액세스 토큰을 얻고 싶을 때 호출
+  /// 메모리에 없으면 SecureStorage에서 읽어와 메모리에 적재
+  Future<String?> pickAccessToken() async {
+    if (_accessToken != null && _accessToken!.isNotEmpty) {
+      return _accessToken;
+    }
+    final t = await _storage.readAccessToken();
+    if (t != null && t.isNotEmpty) {
+      _accessToken = t;
+    }
+    return _accessToken;
+  }
+
+  /// (추가, 선택) Authorization 헤더를 한 번에 만들고 싶을 때
+  Future<Map<String, String>> buildAuthHeader() async {
+    final t = await pickAccessToken();
+    if (t == null || t.isEmpty) return const {};
+    return {'Authorization': 'Bearer $t'};
+  }
+
   // ===== 초기화 =====
 
   Future<void> _init() async {
@@ -149,7 +169,6 @@ class AuthState with ChangeNotifier {
       }
     }
   }
-
 
   // ===== 회원가입 / 로그인 / 로그아웃 =====
 

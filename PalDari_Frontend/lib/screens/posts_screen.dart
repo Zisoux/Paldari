@@ -3,8 +3,7 @@ import '../services/api.dart';
 import '../widgets/pal_bottom_nav.dart';
 import 'new_post_screen.dart';
 import 'post_detail_screen.dart';
-import 'package:characters/characters.dart'; // 👈 추가
-
+import 'package:characters/characters.dart'; // 👈 유지
 
 class PostsScreen extends StatefulWidget {
   const PostsScreen({Key? key}) : super(key: key);
@@ -38,9 +37,19 @@ class _PostsScreenState extends State<PostsScreen> {
   final List<String> categories = const ['전체', '생활', '학업', '지역', '안전', '취업'];
   String selectedCategory = '전체';
 
-  // ── 언어 / 이용자 구분(내/외국인) 필터 ───────────────────────────────────
-  final List<String> languages = const ['전체', '한국어', '영어', '일본어', '말레이어', '중국어'];
-  String selectedLanguage = '전체';
+  // ── ✅ 전역 고정 언어 목록(라벨/코드) + 코드 기반 선택값 ─────────────────
+  // 나라가 달라도 항상 같은 선택 폭을 보이도록 고정.
+  static const List<Map<String, String>> kLanguages = [
+    {'label': '전체',   'code': 'all'},
+    {'label': '한국어', 'code': 'ko'},
+    {'label': '영어',   'code': 'en'},
+    {'label': '일본어', 'code': 'ja'},
+    {'label': '말레이어','code': 'ms'},
+    {'label': '중국어', 'code': 'zh'},
+    {'label': '프랑스어','code': 'fr'},
+    {'label': '독일어', 'code': 'de'},
+  ];
+  String selectedLanguageCode = 'all'; // 'ko'|'en'|...|'all'
 
   final List<String> personas = const ['전체', '내국인', '외국인'];
   String selectedPersona = '전체';
@@ -57,7 +66,7 @@ class _PostsScreenState extends State<PostsScreen> {
       error = null;
     });
     try {
-      final res = await api.fetchPosts();
+      final res = await api.fetchPosts(); // 필요시 country/language 파라미터 추가 가능
       setState(() {
         posts = res;
       });
@@ -74,8 +83,8 @@ class _PostsScreenState extends State<PostsScreen> {
         builder: (_) => NewPostScreen(
           initialCountry: selectedCountry,
           initialCategory: selectedCategory,
-          // 선택 사항: NewPostScreen에 필드를 추가했다면 함께 전달
-          initialLanguage: selectedLanguage,
+          // ⚠️ NewPostScreen도 코드값을 쓰도록 바꿨다면 initialLanguageCode로 전달
+          initialLanguage: _langLabelOf(selectedLanguageCode), // 호환 위해 라벨 전달
           initialPersona: selectedPersona,
         ),
       ),
@@ -128,12 +137,11 @@ class _PostsScreenState extends State<PostsScreen> {
       final postCountry  = (p['country'] ?? '').toString();
       final postCategory = (p['category'] ?? '').toString();
 
-      // 언어: language / lang / postLang 등의 후보 키를 유연하게 읽기
-      final postLanguage = (p['language'] ?? p['lang'] ?? p['postLang'] ?? '').toString();
+      // 언어: 다양한 키/형식 수용 → 코드로 정규화
+      final rawLang = (p['language'] ?? p['lang'] ?? p['postLang'] ?? '').toString();
+      final postLangCode = _normalizeLangCode(rawLang); // '' → '' / '한국어' → 'ko' / 'en' → 'en'
 
       // 내/외국인: 불린/문자 모두 수용
-      // - 불린 후보: isForeigner, foreigner, isForeign
-      // - 숫자/문자 처리: 'true'/'false', 1/0 등
       final bool? foreignBool = (() {
         final v = p['isForeigner'] ?? p['foreigner'] ?? p['isForeign'];
         if (v is bool) return v;
@@ -159,10 +167,10 @@ class _PostsScreenState extends State<PostsScreen> {
       final countryMatch  = selectedCountry.isEmpty ? true : postCountry.contains(selectedCountry);
       final categoryMatch = (selectedCategory == '전체') ? true : postCategory.contains(selectedCategory);
 
-      // 언어 매칭
-      final languageMatch = (selectedLanguage == '전체')
+      // ✅ 언어 매칭(전역 코드 기준). 'all'이면 조건 미적용
+      final languageMatch = (selectedLanguageCode == 'all')
           ? true
-          : (postLanguage == selectedLanguage);
+          : (postLangCode == selectedLanguageCode);
 
       // 내/외국인 매칭
       final personaMatch = (selectedPersona == '전체')
@@ -180,6 +188,71 @@ class _PostsScreenState extends State<PostsScreen> {
 
       return groupMatch && countryMatch && categoryMatch && languageMatch && personaMatch;
     }).toList();
+  }
+
+  // ── helpers: 언어 정규화/라벨 매핑 ────────────────────────────────────────
+  static String _normalizeLangCode(String raw) {
+    final v = raw.trim().toLowerCase();
+    if (v.isEmpty) return ''; // 미지정은 빈 문자열 취급
+
+    // 코드 그대로 들어온 경우
+    const codes = {'all','ko','en','ja','ms','zh','fr','de'};
+    if (codes.contains(v)) return v;
+
+    // 라벨/별칭 매핑
+    switch (v) {
+      case '전체': return 'all';
+      case '한국어':
+      case 'korean':
+      case 'kr':
+      case 'ko-kr':
+        return 'ko';
+
+      case '영어':
+      case 'english':
+      case 'us':
+      case 'en-us':
+      case 'en-gb':
+        return 'en';
+
+      case '일본어':
+      case 'japanese':
+      case 'jp':
+      case 'ja-jp':
+        return 'ja';
+
+      case '말레이어':
+      case 'malay':
+      case 'ms-my':
+        return 'ms';
+
+      case '중국어':
+      case 'chinese':
+      case 'zh-cn':
+      case 'zh-tw':
+        return 'zh';
+
+      case '프랑스어':
+      case 'french':
+      case 'fr-fr':
+        return 'fr';
+
+      case '독일어':
+      case 'german':
+      case 'de-de':
+        return 'de';
+    }
+    // 모르는 값 → 그대로 코드처럼 쓰되, 영문/숫자 아니면 기타
+    final alnum = RegExp(r'^[a-z0-9_-]+$');
+    return alnum.hasMatch(v) ? v : '';
+  }
+
+  static String _langLabelOf(String code) {
+    final m = kLanguages.firstWhere(
+          (e) => e['code'] == code,
+      orElse: () => const {'label': '전체', 'code': 'all'},
+    );
+    return m['label']!;
   }
 
   @override
@@ -261,7 +334,7 @@ class _PostsScreenState extends State<PostsScreen> {
                     ),
                   ),
 
-                  // 언어 드롭다운
+                  // ✅ 언어 드롭다운(항상 같은 전역 목록 / 코드 기반)
                   const SizedBox(width: 8),
                   DropdownButtonHideUnderline(
                     child: Container(
@@ -271,19 +344,19 @@ class _PostsScreenState extends State<PostsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: DropdownButton<String>(
-                        value: selectedLanguage,
+                        value: selectedLanguageCode, // 'all'|'ko'|...
                         borderRadius: BorderRadius.circular(12),
                         icon: const Icon(Icons.expand_more, size: 20, color: Colors.black87),
-                        items: languages
-                            .map((l) => DropdownMenuItem<String>(
-                          value: l,
+                        items: kLanguages
+                            .map((e) => DropdownMenuItem<String>(
+                          value: e['code'],
                           child: Text(
-                            l,
+                            e['label']!,
                             style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
                           ),
                         ))
                             .toList(),
-                        onChanged: (v) => setState(() => selectedLanguage = v!),
+                        onChanged: (code) => setState(() => selectedLanguageCode = code!),
                       ),
                     ),
                   ),

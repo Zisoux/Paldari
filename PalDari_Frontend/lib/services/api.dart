@@ -1,3 +1,4 @@
+// lib/services/api.dart
 import 'package:dio/dio.dart';
 import '../config.dart';
 import 'secure_storage.dart';
@@ -120,9 +121,9 @@ class ApiService {
     required String content,
     String? country,
     String? category,
-    String? language,     // 🔹 추가
-    bool? isForeigner,    // 🔹 추가
-    String? persona,      // 🔹 추가
+    String? language, // 🔹 추가
+    bool? isForeigner, // 🔹 추가
+    String? persona, // 🔹 추가
   }) async {
     final body = <String, dynamic>{
       'title': title,
@@ -142,10 +143,49 @@ class ApiService {
     throw Exception('Failed to create post: ${res.statusCode} ${res.statusMessage}');
   }
 
+  /// 게시글 수정 (제목/내용/국가/카테고리/언어/내외국인/페르소나)
+  Future<Map<String, dynamic>> updatePost({
+    required int id,
+    required String title,
+    required String content,
+    String? country,
+    String? category,
+    String? language,
+    bool? isForeigner,
+    String? persona,
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'content': content,
+      if (country != null && country.isNotEmpty) 'country': country,
+      if (category != null && category.isNotEmpty) 'category': category,
+      if (language != null && language.isNotEmpty) 'language': language,
+      if (isForeigner != null) 'isForeigner': isForeigner,
+      if (persona != null && persona.isNotEmpty) 'persona': persona,
+    };
+
+    final res = await _dio.put('/api/posts/$id', data: body);
+
+    if (res.statusCode == 200) {
+      return Map<String, dynamic>.from(res.data as Map);
+    }
+    throw Exception('Failed to update post: ${res.statusCode} ${res.statusMessage}');
+  }
+
   Future<void> deletePost(int id) async {
     final res = await _dio.delete('/api/posts/$id');
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw Exception('Failed to delete post: ${res.statusCode} ${res.statusMessage}');
+    }
+  }
+
+  /// 🔥 첨부파일 삭제 (작성자 본인만 가능)
+  Future<void> deleteAttachment(int postId, int attachmentId) async {
+    final res = await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
+    if (res.statusCode != 204 && res.statusCode != 200) {
+      throw Exception(
+        'Failed to delete attachment: ${res.statusCode} ${res.statusMessage}',
+      );
     }
   }
 
