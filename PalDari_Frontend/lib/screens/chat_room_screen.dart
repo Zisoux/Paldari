@@ -6,6 +6,7 @@ import 'package:stomp_dart_client/stomp_dart_client.dart';
 
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import '../services/api.dart'; // 번역용 ApiService 사용
 
 class ChatRoomScreen extends StatefulWidget {
   final int roomId;
@@ -28,12 +29,16 @@ class ChatMessageDto {
   final String content;
   final String? sentAt;
 
+  // 🔹 클라이언트에서만 사용하는 번역 결과
+  String? translatedContent;
+
   ChatMessageDto({
     required this.type,
     required this.roomId,
     required this.sender,
     required this.content,
     this.sentAt,
+    this.translatedContent,
   });
 
   factory ChatMessageDto.fromJson(Map<String, dynamic> json) {
@@ -56,6 +61,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   final List<ChatMessageDto> _messages = [];
   final TextEditingController _controller = TextEditingController();
+
+  final ApiService _api = ApiService(); // 🔹 공용 API 서비스
 
   String get _roomTopic => '/topic/chatroom.${widget.roomId}';
 
@@ -108,11 +115,51 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ..clear()
             ..addAll(history);
         });
+
+        // 🔹 옵션: 처음부터 번역 켜져 있으면 기존 메시지도 번역 시도
+        if (_translateEnabled) {
+          _translateExistingMessages();
+        }
       } else {
         debugPrint('loadHistory failed: ${res.statusCode} ${res.body}');
       }
     } catch (e) {
       debugPrint('loadHistory error: $e');
+    }
+  }
+
+  // 🔹 이미 로드된 메시지들을 번역 (토글 ON 시/최초 로딩 시 사용)
+  Future<void> _translateExistingMessages() async {
+    if (!_translateEnabled) return;
+    if (!mounted) return;
+
+    final auth = context.read<AuthState>();
+    final currentUser = auth.username ?? '';
+
+    // 사용자의 앱 언어를 target으로 사용 (ko / en ...)
+    final locale = Localizations.localeOf(context);
+    final targetLang = locale.languageCode;
+
+    for (final m in _messages) {
+      if (m.type != 'TALK') continue;          // 입장 메시지 등은 제외
+      if (m.sender == currentUser) continue;   // 내 메시지는 번역 안해도 됨
+      if (m.translatedContent != null) continue; // 이미 번역된 건 패스
+
+      try {
+        final translated = await _api.autoTranslate(
+          text: m.content,
+          targetLang: targetLang,
+        );
+
+        if (!mounted) return;
+        if (translated == m.content) continue; // 같은 언어면 그대로
+
+        setState(() {
+          m.translatedContent = translated;
+        });
+      } catch (e, st) {
+        debugPrint('translateExistingMessages error: $e\n$st');
+      }
     }
   }
 
@@ -172,16 +219,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
-        // 3) UI 갱신은 프레임 콜백으로 안전하게 연기하고 mounted 재확인
+        // 3) UI 갱신 + 필요시 번역
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          try {
-            setState(() {
-              _messages.add(msg);
-            });
-          } catch (e, st) {
-            debugPrint('stomp setState error: $e\n$st');
-          }
+          _handleIncomingMessage(msg); // 🔹 새 메시지 처리
         });
       },
     );
@@ -194,6 +235,47 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         'roomId': widget.roomId.toString(),
       }),
     );
+  }
+
+  // 🔹 새로 도착한 메시지 처리 + 자동 번역
+  Future<void> _handleIncomingMessage(ChatMessageDto msg) async {
+    if (!mounted) return;
+
+    final auth = context.read<AuthState>();
+    final currentUser = auth.username ?? '';
+
+    // 1) 일단 메시지 추가해서 바로 보이게
+    setState(() {
+      _messages.add(msg);
+    });
+
+    // TALK가 아니면 번역 안 함
+    if (msg.type != 'TALK') return;
+
+    // 내 메시지는 굳이 번역 안 해도 됨 (원하면 이 조건 제거 가능)
+    if (msg.sender == currentUser) return;
+
+    // 번역 토글이 꺼져 있으면 끝
+    if (!_translateEnabled) return;
+
+    try {
+      final locale = Localizations.localeOf(context);
+      final targetLang = locale.languageCode;
+
+      final translated = await _api.autoTranslate(
+        text: msg.content,
+        targetLang: targetLang,
+      );
+
+      if (!mounted) return;
+      if (translated == msg.content) return;
+
+      setState(() {
+        msg.translatedContent = translated;
+      });
+    } catch (e, st) {
+      debugPrint('autoTranslate error: $e\n$st');
+    }
   }
 
   // ---------- 메시지 전송 ----------
@@ -278,6 +360,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
                   final timeText = _formatTime(m.sentAt);
 
+                  // 🔹 번역이 켜져 있고, 번역 결과가 있고, 내 메시지가 아니면
+                  //    번역문을 메인으로 보여주고, 원문은 작게 아래에 표시
+                  String mainText = m.content;
+                  String? originalSubText;
+
+                  if (_translateEnabled &&
+                      m.translatedContent != null &&
+                      !isMe) {
+                    mainText = m.translatedContent!;
+                    if (m.translatedContent != m.content) {
+                      originalSubText = m.content;
+                    }
+                  }
+
                   return Align(
                     alignment:
                     isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -325,19 +421,36 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                   ),
                                 ),
                               Text(
-                                m.content,
+                                mainText,
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF260101),
                                 ),
                               ),
-                              if (_translateEnabled)
+
+                              // 🔹 번역됨 표시: 토글 ON + 실제 번역됐고 내 메시지가 아닐 때만
+                              if (_translateEnabled &&
+                                  m.translatedContent != null &&
+                                  !isMe)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 2),
                                   child: Text(
-                                    '번역됨 (예정)', // TODO: 실제 번역 붙일 자리
+                                    '번역됨',
                                     style: TextStyle(
                                       fontSize: 8,
+                                      color: Colors.brown
+                                          .withOpacity(0.5),
+                                    ),
+                                  ),
+                                ),
+
+                              if (originalSubText != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    '원문: $originalSubText',
+                                    style: TextStyle(
+                                      fontSize: 10,
                                       color: Colors.brown
                                           .withOpacity(0.5),
                                     ),
@@ -472,7 +585,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 setState(() {
                   _translateEnabled = v;
                 });
-                // TODO: 서버로 sync 하고 싶으면 여기서 처리
+                if (v) {
+                  // 🔹 토글 켜질 때, 기존 메시지도 번역 시도
+                  _translateExistingMessages();
+                }
+                // TODO: 서버와 sync 하고 싶다면 여기에서 API 호출
               },
             ),
           ],

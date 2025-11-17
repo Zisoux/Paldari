@@ -26,7 +26,7 @@ spring:
         registration:
           google:
             client-id: 148127187919-rtquq5ti1l14vqte2drpou34j074om6k.apps.googleusercontent.com
-            client-secret: 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 # ⚠ 재발급 필요.. 노출됨!
+            client-secret: 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 # 실제 운영 시에는 외부에 노출되지 않도록 주의
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope:
               - openid
@@ -95,3 +95,13 @@ spring:
 ####################################
 file:
   upload-dir: '/Users/test/Documents/GitHub/Paldari/PalDari_Backend/uploads'   # 서버 안에 파일이 저장될 폴더
+
+####################################
+# Papago API
+####################################
+papago:
+  base-url: https://papago.apigw.ntruss.com
+  text-path: /nmt/v1/translation
+  detect-path: /langs/v1/dect
+  api-key-id: sqs22u4051
+  api-key: 4maLz4vXfq5CoLUXFq5asXOandETHKWtxzbGwwks
