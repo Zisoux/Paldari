@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
@@ -7,8 +8,8 @@ import 'package:stomp_dart_client/stomp_dart_client.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
 import '../services/api.dart'; // 번역용 ApiService 사용
-import 'chat_list_screen.dart'; // 👈 뒤로가기 시 채팅방 리스트로 이동
-import 'buddy_rating_screen.dart'; // ⭐ 버디 평가 화면
+import 'chat_list_screen.dart'; // 뒤로가기 시 채팅방 리스트로 이동
+import 'buddy_rating_screen.dart'; // 버디 평가 화면
 
 class ChatRoomScreen extends StatefulWidget {
   final int roomId;
@@ -31,7 +32,7 @@ class ChatMessageDto {
   final String content;
   final String? sentAt;
 
-  // 🔹 클라이언트에서만 사용하는 번역 결과
+  // 클라이언트에서만 사용하는 번역 결과
   String? translatedContent;
 
   ChatMessageDto({
@@ -58,8 +59,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   StompClient? _stompClient;
   bool _connected = false;
 
-  bool _translateEnabled = true;      // 실시간 번역 on/off 상태
-  bool _showTranslatePanel = false;   // 패널 표시 여부 (오른쪽 상단 버튼으로 토글)
+  // 🔹 전역 설정과 연동되는 실시간 번역 on/off
+  bool _translateEnabled = false;
+  bool _showTranslatePanel = false; // 패널 표시 여부 (오른쪽 상단 버튼으로 토글)
 
   final List<ChatMessageDto> _messages = [];
   final TextEditingController _controller = TextEditingController();
@@ -71,6 +73,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
+
+    // ✅ 전역 설정(AuthState)에서 초기값 가져오기
+    final auth = context.read<AuthState>();
+    _translateEnabled = auth.realtimeTranslation ?? false;
+
     _loadHistory();
     _connect();
   }
@@ -98,12 +105,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
 
-        // JSArray 혹은 다른 List-like 객체가 올 수 있으니 안전하게 List<dynamic>으로 변환
         final List<dynamic> rawList =
         decoded is List ? List<dynamic>.from(decoded) : [];
 
         final history = rawList.map((e) {
-          // 요소가 JS 객체거나 dynamic일 수 있으니 Map<String, dynamic>으로 안전 변환
           final Map<String, dynamic> map = e is Map
               ? Map<String, dynamic>.from(e as Map)
               : (e is String
@@ -119,7 +124,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ..addAll(history);
         });
 
-        // 번역 토글이 켜져 있으면 기존 메시지도 번역 시도
+        // 🔹 번역 토글이 켜져 있으면 기존 메시지도 번역 시도
         if (_translateEnabled) {
           _translateExistingMessages();
         }
@@ -200,7 +205,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       callback: (frame) {
         if (frame.body == null) return;
 
-        // 1) JSON 파싱을 안전하게 처리
         Map<String, dynamic> data;
         try {
           final decoded = jsonDecode(frame.body!);
@@ -212,7 +216,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
-        // 2) DTO 변환 (예외 처리)
         ChatMessageDto msg;
         try {
           msg = ChatMessageDto.fromJson(data);
@@ -221,16 +224,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return;
         }
 
-        // 3) UI 갱신은 프레임 콜백으로 안전하게 연기하고 mounted 재확인
+        // 🔹 새 메시지는 헬퍼로 처리 + 필요시 번역
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          try {
-            setState(() {
-              _messages.add(msg);
-            });
-          } catch (e, st) {
-            debugPrint('stomp setState error: $e\n$st');
-          }
+          _handleIncomingMessage(msg);
         });
       },
     );
@@ -295,7 +292,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         'type': 'TALK',
         'roomId': widget.roomId.toString(),
         'content': text,
-        // 나중에 _translateEnabled 서버로 넘기고 싶으면 같이 전송
       }),
     );
   }
@@ -307,13 +303,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       MaterialPageRoute(
         builder: (_) => BuddyRatingScreen(
           // TODO: 지금은 임시로 roomId/roomName 기반 값 사용
-          // 실제로는 채팅 상대의 userId, 프로필 이미지, 태그 리스트를
-          // ChatRoomScreen 생성자에서 받아와서 넘겨줘야 한다.
-          buddyId: widget.roomId,          // 🔥 임시: 실제 buddyId로 바꾸기
+          buddyId: widget.roomId, // 실제 buddyId로 바꾸기
           chatRoomId: widget.roomId,
           buddyName: widget.roomName,
-          buddyImageUrl: '',               // 🔥 임시: 상대 프로필 URL
-          tags: const [],                  // 🔥 임시: 태그 리스트
+          buddyImageUrl: '',
+          tags: const [],
         ),
       ),
     );
@@ -325,8 +319,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     try {
       final dt = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
-      // 같은 날이면 HH:mm, 아니면 M/d HH:mm 정도
-      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      if (dt.year == now.year &&
+          dt.month == now.month &&
+          dt.day == now.day) {
         final hh = dt.hour.toString().padLeft(2, '0');
         final mm = dt.minute.toString().padLeft(2, '0');
         return '$hh:$mm';
@@ -345,15 +340,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final currentUser = auth.username ?? '';
 
     return WillPopScope(
-      // 시스템 뒤로가기 → 무조건 채팅방 리스트
       onWillPop: () async {
+        // 시스템 뒤로가기 → 무조건 채팅방 리스트
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (_) => const ChatListScreen(),
           ),
         );
-        return false; // 기본 pop 막기
+        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFFFF7F1),
@@ -448,8 +443,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                     m.sender,
                                     style: TextStyle(
                                       fontSize: 10,
-                                      color:
-                                      Colors.brown.withOpacity(0.6),
+                                      color: Colors.brown.withOpacity(0.6),
                                     ),
                                   ),
                                 Text(
@@ -468,8 +462,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                       '번역됨',
                                       style: TextStyle(
                                         fontSize: 8,
-                                        color: Colors.brown
-                                            .withOpacity(0.5),
+                                        color:
+                                        Colors.brown.withOpacity(0.5),
                                       ),
                                     ),
                                   ),
@@ -480,8 +474,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                       '원문: $originalSubText',
                                       style: TextStyle(
                                         fontSize: 10,
-                                        color: Colors.brown
-                                            .withOpacity(0.5),
+                                        color:
+                                        Colors.brown.withOpacity(0.5),
                                       ),
                                     ),
                                   ),
@@ -573,7 +567,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
           const Spacer(),
-          // ⭐ 버디 평가 버튼
+          // 버디 평가 버튼
           IconButton(
             icon: const Icon(
               Icons.star_rate_rounded,
@@ -636,7 +630,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 setState(() {
                   _translateEnabled = v;
                 });
+
+                // 🔹 전역 설정(AuthState) + 백엔드에 반영
+                context
+                    .read<AuthState>()
+                    .updateSettings(realtimeTranslation: v);
+
                 if (v) {
+                  // 켜질 때 기존 메시지도 번역 시도
                   _translateExistingMessages();
                 }
               },

@@ -523,4 +523,21 @@ class ApiService {
       'Failed to load rating summary: ${res.statusCode} ${res.statusMessage}',
     );
   }
+
+  Future<void> updateRealtimeTranslation(bool enabled) async {
+    final res = await _dio.put(
+      '/api/settings/me/translate',
+      data: {
+        'enabled': enabled,
+      },
+    );
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Failed to update realtimeTranslation: '
+            '${res.statusCode} ${res.statusMessage}',
+      );
+    }
+  }
+
 }

@@ -11,11 +11,12 @@ import lombok.Setter;
 public class UserSettings {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;  // users.id
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @MapsId
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", unique = true)
     private User user;
 
     private boolean allowNotification = true;

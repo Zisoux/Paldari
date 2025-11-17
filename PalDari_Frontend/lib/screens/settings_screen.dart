@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
+import '../services/api.dart'; // 🔹 실시간 번역 설정 서버 반영용
 
 class PalColors {
   PalColors._();
@@ -18,6 +20,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
+    final api = ApiService(); // 🔹 공용 API 서비스
 
     final username = (auth.profile?['username'] as String?) ?? '';
     final email = (auth.profile?['email'] as String?) ?? '';
@@ -25,7 +28,7 @@ class SettingsScreen extends StatelessWidget {
     final enabled =
         rawEnabled == true || rawEnabled == 1 || rawEnabled == 'true';
 
-    // ✅ null-safe 기본값 적용
+    // ✅ null-safe 기본값 적용 (AuthState에 값이 없으면 기본값 사용)
     final allowNotification = auth.allowNotification ?? true;
     final allowMatching = auth.allowMatching ?? true;
     final realtimeTranslation = auth.realtimeTranslation ?? false;
@@ -52,7 +55,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       body: ListView(
         children: [
-          // 상단 프로필
+          // ==== 상단 프로필 ====
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: const BoxDecoration(
@@ -101,8 +104,8 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -126,12 +129,14 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // 환경 설정
+          // ==== 환경 설정 ====
           _sectionHeader('환경 설정'),
           _switchTile(
             title: '알림 허용',
             value: allowNotification,
             onChanged: (v) {
+              // 알림은 아직 팀원이 개발 중이니까,
+              // 일단 전역 상태만 업데이트 (서버 연동은 나중에)
               context.read<AuthState>().updateSettings(
                 allowNotification: v,
               );
@@ -141,6 +146,8 @@ class SettingsScreen extends StatelessWidget {
             title: '매칭 허용',
             value: allowMatching,
             onChanged: (v) {
+              // 매칭 허용도 전역 상태만 먼저 반영
+              // (UserSettings.allowMatching 서버 연동은 나중에 같이 추가)
               context.read<AuthState>().updateSettings(
                 allowMatching: v,
               );
@@ -149,20 +156,30 @@ class SettingsScreen extends StatelessWidget {
           _switchTile(
             title: '실시간 번역',
             value: realtimeTranslation,
-            onChanged: (v) {
+            onChanged: (v) async {
+              // 1) 전역 상태 먼저 갱신 (채팅방에서 바로 반영되도록)
               context.read<AuthState>().updateSettings(
                 realtimeTranslation: v,
               );
+
+              // 2) 서버 UserSettings.realtimeTranslation 반영
+              try {
+                await api.updateRealtimeTranslation(v);
+              } catch (e) {
+                // 실패했을 때는 일단 콘솔만 찍고,
+                // 필요하면 SnackBar로 안내해도 됨
+                debugPrint('Failed to update realtimeTranslation: $e');
+              }
             },
           ),
 
-          // 앱 정보
+          // ==== 앱 정보 ====
           _sectionHeader('앱 정보'),
           _navTile(title: '공지사항', onTap: () {}),
           _navTile(title: '고객센터', onTap: () {}),
-          ListTile(
-            title: const Text('앱 버전', style: TextStyle(fontSize: 15)),
-            trailing: const Text(
+          const ListTile(
+            title: Text('앱 버전', style: TextStyle(fontSize: 15)),
+            trailing: Text(
               'Beta',
               style: TextStyle(
                 fontSize: 14,
@@ -173,7 +190,7 @@ class SettingsScreen extends StatelessWidget {
 
           const Divider(height: 24, thickness: 0.4),
 
-          // 로그아웃
+          // ==== 로그아웃 ====
           ListTile(
             title: const Center(
               child: Text(
@@ -219,7 +236,7 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
 
-          // 회원탈퇴
+          // ==== 회원탈퇴 ====
           ListTile(
             title: const Center(
               child: Text(

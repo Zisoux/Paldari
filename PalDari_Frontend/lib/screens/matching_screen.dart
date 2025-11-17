@@ -13,18 +13,28 @@ class _MatchingScreenState extends State<MatchingScreen> {
   final ApiService _api = ApiService();
 
   // UI 상태
-  String? selectedNationality; // BUDDY의 국적
+  String? selectedNationality; // Pal 국적
   String? selectedCategory; // 카테고리
-  bool showAdvanced = false; // 상세 조건 영역 토글
   bool _loading = false; // 전체 매칭 진행 중 로딩
 
-  // 상세 조건 상태 (부모에서 관리)
-  String? _region;
-  String? _gender; // '무관' / '남성' / '여성'
-  RangeValues _ageRange = const RangeValues(20, 30);
+  // 상세 조건 상태
+  String? _language; // 사용 언어 (드롭다운)
+  String? _gender;   // '무관' / '남성' / '여성'
 
-  // 목업 데이터 (국적/카테고리)
-  final nationalities = const ['한국', '일본', '말레이시아', '미국', '기타'];
+  // 국적 리스트 (Pal 국적 선택용)
+  final nationalities = const [
+    '한국',
+    '말레이시아',
+    '일본',
+    '미국',
+    '캐나다',
+    '호주',
+    '영국',
+    '독일',
+    '프랑스',
+  ];
+
+  // 카테고리 리스트 (그대로)
   final categories = const ['생활', '학업', '지역', '안전', '취업'];
 
   // ---------------- 매칭 공통 로직 ----------------
@@ -43,13 +53,16 @@ class _MatchingScreenState extends State<MatchingScreen> {
         pal = await _api.findRandomMatch();
       } else {
         // 조건 기반 "가장 우선순위 높은 1명"
+        //
+        // 🔸 지금은 language를 backend의 region 파라미터에 얹어서 보내는 형태야.
+        //    나중에 backend가 language 필터를 받도록 바뀌면
+        //    ApiService.findBestMatch에 language 파라미터 추가해서 갈아끼우면 됨.
         pal = await _api.findBestMatch(
           nationality: selectedNationality,
           category: selectedCategory,
-          region: _region,
+          region: _language,
           gender: _gender,
-          minAge: _ageRange.start.round(),
-          maxAge: _ageRange.end.round(),
+          // minAge / maxAge 는 더 이상 사용 안 함
         );
       }
 
@@ -59,8 +72,11 @@ class _MatchingScreenState extends State<MatchingScreen> {
         // 매칭 가능한 유저 없음
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-            Text(random ? '매칭 가능한 Pal이 없어요. 😢' : '조건에 맞는 Pal을 찾지 못했어요.'),
+            content: Text(
+              random
+                  ? '매칭 가능한 Pal이 없어요. 😢'
+                  : '조건에 맞는 Pal을 찾지 못했어요.',
+            ),
           ),
         );
         setState(() => _loading = false);
@@ -83,11 +99,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
 
   /// "매칭되었어요!" 모달
   Future<void> _showMatchDialog(Map<String, dynamic> pal) async {
-    final nickname = (pal['nickname'] ??
-        pal['username'] ??
-        pal['name'] ??
-        '알 수 없는 Pal')
-        .toString();
+    final nickname = (pal['nickname'] ?? pal['username'] ?? pal['name'] ?? '알 수 없는 Pal').toString();
     final country = (pal['country'] ?? '').toString();
     final lang = (pal['language'] ?? '').toString();
     final intro = (pal['introduction'] ?? '').toString();
@@ -161,8 +173,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
   Future<void> _createChatAndOpen(int targetUserId, String fallbackName) async {
     setState(() => _loading = true);
     try {
-      final room =
-      await _api.createChatForMatching(targetUserId: targetUserId);
+      final room = await _api.createChatForMatching(targetUserId: targetUserId);
 
       if (!mounted) return;
 
@@ -174,9 +185,8 @@ class _MatchingScreenState extends State<MatchingScreen> {
         return;
       }
 
-      final roomId = roomIdDynamic is int
-          ? roomIdDynamic
-          : int.tryParse(roomIdDynamic.toString()) ?? 0;
+      final roomId =
+      roomIdDynamic is int ? roomIdDynamic : int.tryParse(roomIdDynamic.toString()) ?? 0;
 
       final roomName = (room['name'] ?? fallbackName).toString();
 
@@ -242,11 +252,11 @@ class _MatchingScreenState extends State<MatchingScreen> {
             ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                // 1) BUDDY의 국적은?
+                // 1) Pal 국적 선택
                 const SizedBox(height: 8),
                 const Center(
                   child: Text(
-                    'BUDDY의 국적은?',
+                    'Pal 국적 선택',
                     style: TextStyle(
                       color: brown,
                       fontSize: 18,
@@ -266,8 +276,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         label: Text(n),
                         selected: selectedNationality == n,
                         selectedColor: orange.withOpacity(0.6),
-                        onSelected: (_) =>
-                            setState(() => selectedNationality = n),
+                        onSelected: (_) => setState(() => selectedNationality = n),
                       ),
                   ],
                 ),
@@ -297,64 +306,28 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         label: Text(c),
                         selected: selectedCategory == c,
                         selectedColor: orange.withOpacity(0.6),
-                        onSelected: (_) =>
-                            setState(() => selectedCategory = c),
+                        onSelected: (_) => setState(() => selectedCategory = c),
                       ),
                   ],
                 ),
 
                 const SizedBox(height: 28),
 
-                // 3) 상세 조건 카드 (토글)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  leading: Image.network(
-                    'https://placehold.co/24x21/png',
-                    width: 24,
-                    height: 21,
-                    errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.tune, color: brown),
-                  ),
-                  title: const Text(
-                    '상세 조건 설정(선택)',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: brown,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  trailing: Icon(
-                    showAdvanced ? Icons.expand_less : Icons.expand_more,
+                // 3) 상세 조건 설정 (항상 펼쳐진 상태)
+                const Text(
+                  '상세 조건 설정 (선택)',
+                  style: TextStyle(
                     color: brown,
-                  ),
-                  onTap: () => setState(() => showAdvanced = !showAdvanced),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: Color(0xFFF29D52)),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-
-                AnimatedCrossFade(
-                  firstChild: const SizedBox.shrink(),
-                  secondChild: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _AdvancedFilters(
-                      region: _region,
-                      gender: _gender,
-                      ageRange: _ageRange,
-                      onRegionChanged: (v) =>
-                          setState(() => _region = v),
-                      onGenderChanged: (v) =>
-                          setState(() => _gender = v),
-                      onAgeRangeChanged: (v) =>
-                          setState(() => _ageRange = v),
-                    ),
-                  ),
-                  crossFadeState: showAdvanced
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: const Duration(milliseconds: 200),
+                const SizedBox(height: 12),
+                _AdvancedFilters(
+                  language: _language,
+                  gender: _gender,
+                  onLanguageChanged: (v) => setState(() => _language = v),
+                  onGenderChanged: (v) => setState(() => _gender = v),
                 ),
 
                 const SizedBox(height: 28),
@@ -368,12 +341,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side:
-                        BorderSide(color: Colors.black.withOpacity(0.5)),
+                        side: BorderSide(color: Colors.black.withOpacity(0.5)),
                       ),
                     ),
-                    onPressed:
-                    _loading ? null : () => _startMatching(random: false),
+                    onPressed: _loading ? null : () => _startMatching(random: false),
                     child: const Text(
                       '매칭 시작',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -385,17 +356,13 @@ class _MatchingScreenState extends State<MatchingScreen> {
                 const SizedBox(height: 24),
                 Row(
                   children: const [
-                    Expanded(
-                        child:
-                        Divider(color: Color(0xFF595959), height: 1)),
+                    Expanded(child: Divider(color: Color(0xFF595959), height: 1)),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Text('또는',
-                          style: TextStyle(color: Color(0xFF595959))),
+                      child:
+                      Text('또는', style: TextStyle(color: Color(0xFF595959))),
                     ),
-                    Expanded(
-                        child:
-                        Divider(color: Color(0xFF595959), height: 1)),
+                    Expanded(child: Divider(color: Color(0xFF595959), height: 1)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -409,12 +376,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side:
-                        BorderSide(color: Colors.black.withOpacity(0.5)),
+                        side: BorderSide(color: Colors.black.withOpacity(0.5)),
                       ),
                     ),
-                    onPressed:
-                    _loading ? null : () => _startMatching(random: true),
+                    onPressed: _loading ? null : () => _startMatching(random: true),
                     child: const Text(
                       '조건 없이 빠른 대화 시작',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -438,23 +403,19 @@ class _MatchingScreenState extends State<MatchingScreen> {
   }
 }
 
-/// 상세 조건(선택) - 부모에서 상태를 관리하고, 여기서는 UI + 콜백만 담당
+/// 상세 조건(선택) - 사용 언어 + 성별
 class _AdvancedFilters extends StatelessWidget {
-  final String? region;
+  final String? language;
   final String? gender;
-  final RangeValues ageRange;
-  final ValueChanged<String?> onRegionChanged;
+  final ValueChanged<String?> onLanguageChanged;
   final ValueChanged<String?> onGenderChanged;
-  final ValueChanged<RangeValues> onAgeRangeChanged;
 
   const _AdvancedFilters({
     super.key,
-    required this.region,
+    required this.language,
     required this.gender,
-    required this.ageRange,
-    required this.onRegionChanged,
+    required this.onLanguageChanged,
     required this.onGenderChanged,
-    required this.onAgeRangeChanged,
   });
 
   @override
@@ -464,17 +425,23 @@ class _AdvancedFilters extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 지역
-        const Text('지역', style: labelStyle),
+        // 사용 언어
+        const Text('사용 언어', style: labelStyle),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: region,
+          value: language,
           items: const [
-            DropdownMenuItem(value: '서울', child: Text('서울')),
-            DropdownMenuItem(value: '인천', child: Text('인천')),
-            DropdownMenuItem(value: '쿠알라룸푸르', child: Text('쿠알라룸푸르')),
+            DropdownMenuItem(value: '한국어', child: Text('한국어')),
+            DropdownMenuItem(value: 'English (US)', child: Text('English (US)')),
+            DropdownMenuItem(value: 'Bahasa Melayu', child: Text('Bahasa Melayu')),
+            DropdownMenuItem(value: '日本語', child: Text('日本語')),
+            DropdownMenuItem(value: 'Deutsch', child: Text('Deutsch')),
+            DropdownMenuItem(value: 'Français', child: Text('Français')),
+            DropdownMenuItem(value: 'English (UK)', child: Text('English (UK)')),
+            DropdownMenuItem(value: 'English (CA)', child: Text('English (CA)')),
+            DropdownMenuItem(value: 'English (AU)', child: Text('English (AU)')),
           ],
-          onChanged: onRegionChanged,
+          onChanged: onLanguageChanged,
           decoration: _fieldDecoration(),
         ),
         const SizedBox(height: 16),
@@ -491,22 +458,6 @@ class _AdvancedFilters extends StatelessWidget {
           ],
           onChanged: onGenderChanged,
           decoration: _fieldDecoration(),
-        ),
-        const SizedBox(height: 16),
-
-        // 나이 범위
-        const Text('나이 범위', style: labelStyle),
-        const SizedBox(height: 4),
-        RangeSlider(
-          min: 15,
-          max: 60,
-          divisions: 45,
-          values: ageRange,
-          labels: RangeLabels(
-            '${ageRange.start.round()}',
-            '${ageRange.end.round()}',
-          ),
-          onChanged: onAgeRangeChanged,
         ),
       ],
     );

@@ -20,6 +20,43 @@ class PalColors {
   static const textSecondary = Color(0xFF9F9FA1);
 }
 
+/// 태그 코드 -> 한글 라벨 매핑 (매칭 설정과 동일)
+const Map<String, String> kTagCodeToLabel = {
+  'LIFE': '생활',
+  'STUDY': '학업',
+  'REGION': '지역',
+  'JOB': '취업',
+  'SAFETY': '안전',
+};
+
+/// 매칭 설정에서 사용하던 국가 목록과 동일하게 고정
+const List<String> kFilterCountries = [
+  '말레이시아',
+  '한국',
+  '일본',
+  '미국',
+  '캐나다',
+  '호주',
+  '영국',
+  '독일',
+  '프랑스',
+];
+
+/// 서버에서 온 값이 코드(LIFE)든, 이미 한글 라벨(생활)이든
+/// 화면에 표시할 "라벨"로 변환
+String tagLabel(String value) {
+  if (kTagCodeToLabel.containsKey(value)) {
+    // 코드 -> 라벨
+    return kTagCodeToLabel[value]!;
+  }
+  if (kTagCodeToLabel.containsValue(value)) {
+    // 이미 라벨(한글 등)인 경우 그대로 사용
+    return value;
+  }
+  // 매핑에 없는 값이면 있는 그대로 표시
+  return value;
+}
+
 /// =====================
 ///    Home Screen
 /// =====================
@@ -39,7 +76,7 @@ class _PalHomeScreenState extends State<PalHomeScreen> {
   Widget build(BuildContext context) {
     // auth는 지금은 안 쓰지만, 나중에 필요할 수도 있어서 남겨둠
     final auth = context.watch<AuthState>();
-    final _ = auth.profile;
+    final _ = auth.profile; // profile 변경 시 화면 리빌드를 위해 참조만 유지
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -150,7 +187,7 @@ class _PalListSectionState extends State<_PalListSection> {
 
   // 필터 상태
   String? _filterCountry;
-  String? _filterTag;
+  String? _filterTag; // 태그 코드 (LIFE/…)
 
   @override
   void initState() {
@@ -166,7 +203,7 @@ class _PalListSectionState extends State<_PalListSection> {
 
       setState(() {
         _allPals = pals;
-        _applyFilter();
+        _displayPals = _buildFilteredList();
       });
     } catch (e) {
       debugPrint('Failed to load home pals: $e');
@@ -181,13 +218,9 @@ class _PalListSectionState extends State<_PalListSection> {
     }
   }
 
-  /// 외부(AppBar)에서 필터 버튼 눌렀을 때 호출
-  void openFilterBottomSheetFromOutside() {
-    _openFilterBottomSheet();
-  }
-
-  void _applyFilter() {
-    List<Pal> list = List.of(_allPals);
+  /// 현재 필터 상태에 맞는 리스트를 만들어서 반환
+  List<Pal> _buildFilteredList() {
+    final list = List<Pal>.from(_allPals);
 
     int score(Pal p) {
       int s = 0;
@@ -205,26 +238,22 @@ class _PalListSectionState extends State<_PalListSection> {
     }
 
     list.sort((a, b) => score(b).compareTo(score(a)));
+    return list;
+  }
 
-    setState(() {
-      _displayPals = list;
-    });
+  /// 외부(AppBar)에서 필터 버튼 눌렀을 때 호출
+  void openFilterBottomSheetFromOutside() {
+    _openFilterBottomSheet();
   }
 
   Future<void> _openFilterBottomSheet() async {
     String? tempCountry = _filterCountry;
     String? tempTag = _filterTag;
 
-    final countries = _allPals
-        .map((p) => p.country)
-        .where((c) => c.isNotEmpty)
-        .toSet()
-        .toList();
-    final tags = _allPals
-        .expand((p) => p.tags)
-        .where((t) => t.isNotEmpty)
-        .toSet()
-        .toList();
+    // 💡 이제는 Pals에서 추출하지 않고,
+    // 매칭 설정과 동일한 고정 목록 사용
+    final countries = kFilterCountries;
+    final tagCodes = kTagCodeToLabel.keys.toList(); // ['LIFE','STUDY',…]
 
     final applied = await showModalBottomSheet<bool>(
       context: context,
@@ -282,7 +311,7 @@ class _PalListSectionState extends State<_PalListSection> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  if (tags.isNotEmpty) ...[
+                  if (tagCodes.isNotEmpty) ...[
                     const Text(
                       '관심 태그',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -301,13 +330,14 @@ class _PalListSectionState extends State<_PalListSection> {
                             });
                           },
                         ),
-                        for (final t in tags)
+                        for (final code in tagCodes)
                           ChoiceChip(
-                            label: Text(t),
-                            selected: tempTag == t,
+                            // 코드 -> 한글 라벨
+                            label: Text(tagLabel(code)),
+                            selected: tempTag == code,
                             onSelected: (_) {
                               setModalState(() {
-                                tempTag = t;
+                                tempTag = code;
                               });
                             },
                           ),
@@ -348,8 +378,8 @@ class _PalListSectionState extends State<_PalListSection> {
       setState(() {
         _filterCountry = tempCountry;
         _filterTag = tempTag;
+        _displayPals = _buildFilteredList();
       });
-      _applyFilter();
     }
   }
 
@@ -369,16 +399,21 @@ class _PalListSectionState extends State<_PalListSection> {
                     _ActiveFilterChip(
                       label: '국가: ${_filterCountry!}',
                       onClear: () {
-                        setState(() => _filterCountry = null);
-                        _applyFilter();
+                        setState(() {
+                          _filterCountry = null;
+                          _displayPals = _buildFilteredList();
+                        });
                       },
                     ),
                   if (_filterTag != null)
                     _ActiveFilterChip(
-                      label: '태그: ${_filterTag!}',
+                      // 태그도 한글 라벨로 표시
+                      label: '태그: ${tagLabel(_filterTag!)}',
                       onClear: () {
-                        setState(() => _filterTag = null);
-                        _applyFilter();
+                        setState(() {
+                          _filterTag = null;
+                          _displayPals = _buildFilteredList();
+                        });
                       },
                     ),
                 ],
@@ -401,28 +436,33 @@ class _PalListSectionState extends State<_PalListSection> {
               ),
             ),
           )
-              : ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: Text(
-                  'Pal LIST',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Poppins',
-                    color: Colors.black,
+              : RefreshIndicator(
+            onRefresh: _loadPals,
+            child: ListView(
+              padding:
+              const EdgeInsets.fromLTRB(16, 12, 16, 120),
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'Pal LIST',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Poppins',
+                      color: Colors.black,
+                    ),
                   ),
                 ),
-              ),
-              ..._displayPals.map(
-                    (p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: PalCard(pal: p),
+                ..._displayPals.map(
+                      (p) => Padding(
+                    padding:
+                    const EdgeInsets.only(bottom: 12),
+                    child: PalCard(pal: p),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -486,6 +526,9 @@ class PalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locationText =
+    pal.regions.isNotEmpty ? pal.regions.join(', ') : pal.country;
+
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
@@ -548,7 +591,7 @@ class PalCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      pal.country,
+                      locationText,
                       style: const TextStyle(
                         color: PalColors.textSecondary,
                         fontSize: 14,
@@ -560,8 +603,10 @@ class PalCard extends StatelessWidget {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children:
-                      pal.tags.map((t) => _TagChip(t)).toList(),
+                      children: pal.tags
+                      // 코드/영문이든 한글이든 tagLabel로 한 번 더 태워서 표시
+                          .map((t) => _TagChip(tagLabel(t)))
+                          .toList(),
                     ),
                   ],
                 ),
@@ -608,16 +653,19 @@ class Pal {
   final int id;
   final String name;
   final String country;
-  final List<String> tags;
+  final List<String> tags;    // 서버에서 온 "원본" 값 (코드 or 라벨)
+  final List<String> regions; // 지역 라벨 (영문/한글 섞여도 OK)
   final bool online;
 
   Pal({
     required this.id,
     required this.name,
     required this.country,
-    required this.tags,
+    List<String>? tags,
+    List<String>? regions,
     this.online = false,
-  });
+  })  : tags = tags ?? const [],
+        regions = regions ?? const [];
 
   String get initial =>
       name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
@@ -633,11 +681,36 @@ class Pal {
 
     final country = (json['country'] ?? '').toString();
 
+    // ---- tags 처리 ----
     List<String> tags = [];
-    final rawTags = json['tags'] ?? json['tagNames'];
+
+    // 한글/표시용이 `tagNames`라면 이걸 먼저 사용, 없으면 `tags` 사용
+    final rawTags = json['tagNames'] ?? json['tags'];
 
     if (rawTags is List) {
       tags = rawTags.map((e) => e.toString()).toList();
+    }
+
+    // ---- regions 처리 ----
+    List<String> regions = [];
+    final rawRegions = json['regions'] ?? json['userRegions'];
+
+    if (rawRegions is List) {
+      regions = rawRegions
+          .map((e) {
+        if (e is Map) {
+          // [{ "region": "서울" }, { "region": "인천" }] 이런 케이스
+          final r = e['region'] ?? e['name'] ?? e['regionName'];
+          return r?.toString() ?? '';
+        }
+        // ["서울", "인천"] 처럼 문자열 리스트인 케이스
+        return e.toString();
+      })
+          .where((s) => s.isNotEmpty)
+          .toList();
+    } else if (json['region'] != null) {
+      // 단일 region 문자열만 있는 케이스
+      regions = [json['region'].toString()];
     }
 
     final online =
@@ -650,6 +723,7 @@ class Pal {
       name: name,
       country: country,
       tags: tags,
+      regions: regions,
       online: online,
     );
   }
