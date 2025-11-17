@@ -45,21 +45,22 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
 
             String token = authHeader.substring(7);
 
-            // 🔍 JwtTokenProvider.validate() 사용
-            if (!jwtTokenProvider.validate(token)) {
+            // 🔄 validate() → validateToken()
+            if (!jwtTokenProvider.validateToken(token)) {
                 log.warn("Invalid JWT token in STOMP CONNECT");
                 throw new MessagingException("Invalid JWT token");
             }
 
-            // 👤 토큰에서 username 추출
-            String username = jwtTokenProvider.getUsername(token);
+            // 🔄 getUsername() → getSubject()
+            String username = jwtTokenProvider.getSubject(token);
 
-            // 여기서는 간단히 username만 Authentication에 넣어줌
-            // (권한 필요하면 UserDetailsService 통해 다시 조회해서 authorities 채워도 됨)
             Authentication authentication =
-                    new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList());
+                    new UsernamePasswordAuthenticationToken(
+                            username,
+                            null,
+                            Collections.emptyList()
+                    );
 
-            // STOMP 세션에 사용자 정보 저장 → 이후 Controller에서 Principal로 접근 가능
             accessor.setUser(authentication);
 
             log.debug("STOMP user authenticated: {}", username);

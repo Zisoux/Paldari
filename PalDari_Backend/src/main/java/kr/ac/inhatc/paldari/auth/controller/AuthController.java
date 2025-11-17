@@ -89,7 +89,20 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
         try {
-            User user = userService.getByUsername(req.username());
+            User user;
+
+            String input = req.username().trim();
+
+            // 이메일 형식인지 검사
+            if (input.contains("@")) {
+                user = userService.findByEmail(input);
+            } else {
+                user = userService.getByUsername(input);
+            }
+
+            if (user == null) {
+                throw new BadCredentialsException("bad credentials");
+            }
 
             if (user.getPassword() == null ||
                     !passwordEncoder.matches(req.password(), user.getPassword())) {
@@ -100,7 +113,7 @@ public class AuthController {
                 throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
             }
 
-            String subject = user.getUsername();
+            String subject = user.getUsername(); // username으로 JWT subject 저장
 
             String accessToken = jwtTokenProvider.generateAccessToken(subject);
             String refreshToken = jwtTokenProvider.generateRefreshToken(subject);

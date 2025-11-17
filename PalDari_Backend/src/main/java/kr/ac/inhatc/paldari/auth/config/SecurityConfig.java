@@ -75,16 +75,18 @@ public class SecurityConfig {
                                 "/login/oauth2/**",
                                 "/oauth-success"
                         ).permitAll()
-                        // 웹소켓 엔드포인트
-                        .requestMatchers("/uploads/**").permitAll()   // 🔥 여기에 추가
+                        // 정적 리소스 & 웹소켓 엔드포인트
+                        .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/ws-chat/**").permitAll()
                         // 게시글 조회는 공개
                         .requestMatchers(HttpMethod.GET, "/api/posts/**").permitAll()
                         // 글쓰기/수정/삭제는 인증 필요
                         .requestMatchers("/api/posts/**").authenticated()
+                        // ⭐ 평점 API는 인증 필요
+                        .requestMatchers("/api/ratings/**").authenticated()
                         // 채팅 API는 인증 필요
                         .requestMatchers("/api/chat/**").authenticated()
-                        // 프로필 관련은 인증 필요
+                        // 프로필 관련은 인증 필요 (rating-summary 포함)
                         .requestMatchers("/api/profile/**").authenticated()
                         // 나머지는 전부 인증 필요
                         .anyRequest().authenticated()

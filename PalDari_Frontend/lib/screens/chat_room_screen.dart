@@ -6,6 +6,7 @@ import 'package:stomp_dart_client/stomp_dart_client.dart';
 
 import '../config.dart';
 import '../providers/auth_provider.dart';
+import 'buddy_rating_screen.dart'; // ⭐ 버디 평가 화면
 
 class ChatRoomScreen extends StatefulWidget {
   final int roomId;
@@ -22,7 +23,7 @@ class ChatRoomScreen extends StatefulWidget {
 }
 
 class ChatMessageDto {
-  final String type;      // TALK / ENTER 등
+  final String type; // TALK / ENTER 등
   final String roomId;
   final String sender;
   final String content;
@@ -51,8 +52,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   StompClient? _stompClient;
   bool _connected = false;
 
-  bool _translateEnabled = true;      // 실시간 번역 on/off 상태
-  bool _showTranslatePanel = false;   // 패널 표시 여부 (오른쪽 상단 버튼으로 토글)
+  bool _translateEnabled = true; // 실시간 번역 on/off 상태
+  bool _showTranslatePanel = false; // 패널 표시 여부 (오른쪽 상단 버튼으로 토글)
 
   final List<ChatMessageDto> _messages = [];
   final TextEditingController _controller = TextEditingController();
@@ -90,15 +91,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         final decoded = jsonDecode(res.body);
 
         // JSArray 혹은 다른 List-like 객체가 올 수 있으니 안전하게 List<dynamic>으로 변환
-        final List<dynamic> rawList = decoded is List
-            ? List<dynamic>.from(decoded)
-            : [];
+        final List<dynamic> rawList =
+        decoded is List ? List<dynamic>.from(decoded) : [];
 
         final history = rawList.map((e) {
           // 요소가 JS 객체거나 dynamic일 수 있으니 Map<String, dynamic>으로 안전 변환
           final Map<String, dynamic> map = e is Map
               ? Map<String, dynamic>.from(e as Map)
-              : (e is String ? jsonDecode(e) as Map<String, dynamic> : <String, dynamic>{});
+              : (e is String
+              ? jsonDecode(e) as Map<String, dynamic>
+              : <String, dynamic>{});
           return ChatMessageDto.fromJson(map);
         }).toList(growable: false);
 
@@ -155,9 +157,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         Map<String, dynamic> data;
         try {
           final decoded = jsonDecode(frame.body!);
-          data = decoded is Map
-              ? Map<String, dynamic>.from(decoded)
-              : <String, dynamic>{};
+          data =
+          decoded is Map ? Map<String, dynamic>.from(decoded) : <String, dynamic>{};
         } catch (e, st) {
           debugPrint('stomp parse json error: $e\n$st');
           return;
@@ -216,6 +217,25 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
+  // ---------- 버디 평가 화면 이동 ----------
+  void _openRatingScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BuddyRatingScreen(
+          // TODO: 지금은 임시로 roomId/roomName 기반 값 사용
+          // 실제로는 채팅 상대의 userId, 프로필 이미지, 태그 리스트를
+          // ChatRoomScreen 생성자에서 받아와서 넘겨줘야 한다.
+          buddyId: widget.roomId,          // 🔥 임시: 실제 buddyId로 바꾸기
+          chatRoomId: widget.roomId,
+          buddyName: widget.roomName,
+          buddyImageUrl: '',               // 🔥 임시: 상대 프로필 URL
+          tags: const [],                  // 🔥 임시: 태그 리스트
+        ),
+      ),
+    );
+  }
+
   // ---------- 시간 표시 포맷 ----------
   String _formatTime(String? iso) {
     if (iso == null || iso.isEmpty) return '';
@@ -223,7 +243,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       final dt = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
       // 같은 날이면 HH:mm, 아니면 M/d HH:mm 정도
-      if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      if (dt.year == now.year &&
+          dt.month == now.month &&
+          dt.day == now.day) {
         final hh = dt.hour.toString().padLeft(2, '0');
         final mm = dt.minute.toString().padLeft(2, '0');
         return '$hh:$mm';
@@ -282,9 +304,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     alignment:
                     isMe ? Alignment.centerRight : Alignment.centerLeft,
                     child: Column(
-                      crossAxisAlignment: isMe
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
                         Container(
                           margin: const EdgeInsets.symmetric(vertical: 2),
@@ -320,8 +341,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                   m.sender,
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color:
-                                    Colors.brown.withOpacity(0.6),
+                                    color: Colors.brown.withOpacity(0.6),
                                   ),
                                 ),
                               Text(
@@ -338,8 +358,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                     '번역됨 (예정)', // TODO: 실제 번역 붙일 자리
                                     style: TextStyle(
                                       fontSize: 8,
-                                      color: Colors.brown
-                                          .withOpacity(0.5),
+                                      color:
+                                      Colors.brown.withOpacity(0.5),
                                     ),
                                   ),
                                 ),
@@ -354,8 +374,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                               timeText,
                               style: TextStyle(
                                 fontSize: 8,
-                                color:
-                                Colors.brown.withOpacity(0.5),
+                                color: Colors.brown.withOpacity(0.5),
                               ),
                             ),
                           ),
@@ -419,6 +438,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
           const Spacer(),
+          // ⭐ 버디 평가 버튼
+          IconButton(
+            icon: const Icon(
+              Icons.star_rate_rounded,
+              color: Color(0xFFFAAD55),
+              size: 24,
+            ),
+            tooltip: '버디 평가하기',
+            onPressed: _openRatingScreen,
+          ),
           // 실시간 번역 설정 토글 버튼 (패널 열기/닫기)
           IconButton(
             icon: const Icon(

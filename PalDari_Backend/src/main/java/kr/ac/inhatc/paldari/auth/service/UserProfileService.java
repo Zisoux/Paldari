@@ -42,6 +42,15 @@ public class UserProfileService {
     public ProfileBasicDto getBasic(String username) {
         User u = getUserOrThrow(username);
 
+        // 🔹 태그/지역도 같이 조회해서 DTO에 담는다.
+        List<String> tags = tagRepository.findByUser(u).stream()
+                .map(UserTag::getTag)
+                .collect(Collectors.toList());
+
+        List<String> regions = regionRepository.findByUser(u).stream()
+                .map(UserRegion::getRegion)
+                .collect(Collectors.toList());
+
         ProfileBasicDto dto = new ProfileBasicDto();
         dto.setGender(emptyToNull(u.getGender()));
         dto.setBirthdate(u.getBirthdate() == null ? null : u.getBirthdate().toString()); // yyyy-MM-dd
@@ -49,6 +58,11 @@ public class UserProfileService {
         dto.setLivingIn(emptyToNull(u.getLivingIn()));
         dto.setLanguage(emptyToNull(u.getLanguage()));
         dto.setIntroduction(emptyToNull(u.getIntroduction()));
+
+        // 🔹 추가된 필드 세팅
+        dto.setTags(tags);
+        dto.setRegions(regions);
+
         return dto;
     }
 
@@ -59,6 +73,7 @@ public class UserProfileService {
     public ProfileBasicDto updateBasic(String username, UpdateProfileBasicRequest req) {
         User u = getUserOrThrow(username);
 
+        // ----- User 엔티티 기본 필드 업데이트 -----
         if (req.getGender() != null) {
             u.setGender(emptyToNull(req.getGender()));
         }
@@ -87,6 +102,52 @@ public class UserProfileService {
         }
         if (req.getIntroduction() != null) {
             u.setIntroduction(emptyToNull(req.getIntroduction()));
+        }
+
+        // ----- 태그 업데이트 (정책: 태그 = 코드, 문자열 그대로 보관) -----
+        // null  : 태그 변경 안 함
+        // []    : 기존 태그 모두 삭제
+        // [..]  : 기존 태그 모두 지우고, 새 리스트로 교체
+        if (req.getTags() != null) {
+            List<String> normTags = req.getTags().stream()
+                    .filter(t -> t != null && !t.trim().isEmpty())
+                    .map(String::trim)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // 기존 태그 전체 삭제 후 다시 저장
+            List<UserTag> existing = tagRepository.findByUser(u);
+            tagRepository.deleteAll(existing);
+
+            for (String t : normTags) {
+                UserTag ut = new UserTag();
+                ut.setUser(u);
+                ut.setTag(t); // "LIFE", "STUDY" 같은 코드 그대로 저장
+                tagRepository.save(ut);
+            }
+        }
+
+        // ----- 지역 업데이트 (정책: 지역 = 라벨 문자열 그대로 보관) -----
+        // null  : 지역 변경 안 함
+        // []    : 기존 지역 모두 삭제
+        // [..]  : 기존 지역 모두 지우고, 새 리스트로 교체
+        if (req.getRegions() != null) {
+            List<String> normRegions = req.getRegions().stream()
+                    .filter(r -> r != null && !r.trim().isEmpty())
+                    .map(String::trim)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // 기존 지역 전체 삭제 후 다시 저장
+            List<UserRegion> existingRegions = regionRepository.findByUser(u);
+            regionRepository.deleteAll(existingRegions);
+
+            for (String r : normRegions) {
+                UserRegion ur = new UserRegion();
+                ur.setUser(u);
+                ur.setRegion(r); // "Seoul", "Kuala Lumpur" 같은 라벨 문자열 그대로 저장
+                regionRepository.save(ur);
+            }
         }
 
         userRepository.save(u);

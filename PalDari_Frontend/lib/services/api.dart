@@ -92,7 +92,8 @@ class ApiService {
       }
       throw Exception('Unexpected posts response format');
     }
-    throw Exception('Failed to load posts: ${res.statusCode} ${res.statusMessage}');
+    throw Exception(
+        'Failed to load posts: ${res.statusCode} ${res.statusMessage}');
   }
 
   Future<Map<String, dynamic>> fetchPost(int id) async {
@@ -140,7 +141,8 @@ class ApiService {
     if (res.statusCode == 201 || res.statusCode == 200) {
       return Map<String, dynamic>.from(res.data as Map);
     }
-    throw Exception('Failed to create post: ${res.statusCode} ${res.statusMessage}');
+    throw Exception(
+        'Failed to create post: ${res.statusCode} ${res.statusMessage}');
   }
 
   /// 게시글 수정 (제목/내용/국가/카테고리/언어/내외국인/페르소나)
@@ -169,19 +171,22 @@ class ApiService {
     if (res.statusCode == 200) {
       return Map<String, dynamic>.from(res.data as Map);
     }
-    throw Exception('Failed to update post: ${res.statusCode} ${res.statusMessage}');
+    throw Exception(
+        'Failed to update post: ${res.statusCode} ${res.statusMessage}');
   }
 
   Future<void> deletePost(int id) async {
     final res = await _dio.delete('/api/posts/$id');
     if (res.statusCode != 204 && res.statusCode != 200) {
-      throw Exception('Failed to delete post: ${res.statusCode} ${res.statusMessage}');
+      throw Exception(
+          'Failed to delete post: ${res.statusCode} ${res.statusMessage}');
     }
   }
 
   /// 🔥 첨부파일 삭제 (작성자 본인만 가능)
   Future<void> deleteAttachment(int postId, int attachmentId) async {
-    final res = await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
+    final res =
+    await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw Exception(
         'Failed to delete attachment: ${res.statusCode} ${res.statusMessage}',
@@ -220,7 +225,8 @@ class ApiService {
     }
   }
 
-  Future<void> updateComment(int postId, int commentId, {required String content}) async {
+  Future<void> updateComment(int postId, int commentId,
+      {required String content}) async {
     final res = await _dio.put(
       '/api/posts/$postId/comments/$commentId',
       data: {'content': content},
@@ -231,9 +237,61 @@ class ApiService {
   }
 
   Future<void> deleteComment(int postId, int commentId) async {
-    final res = await _dio.delete('/api/posts/$postId/comments/$commentId');
+    final res =
+    await _dio.delete('/api/posts/$postId/comments/$commentId');
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw Exception('Failed to delete comment');
     }
+  }
+
+  // ========== RATINGS ==========
+
+  /// 채팅방에서 Buddy 평점 남기기
+  ///
+  /// 백엔드 `POST /api/ratings` 와 연결됨.
+  /// - buddyId : 평가 받을 사람의 memberId
+  /// - chatRoomId : 어떤 채팅방/매칭에 대한 평가인지
+  /// - score : 1 ~ 5
+  /// - comment : 선택 사항 (null 또는 빈 문자열이면 전송 안 함)
+  Future<void> submitRating({
+    required int buddyId,
+    required int chatRoomId,
+    required int score,
+    String? comment,
+  }) async {
+    final body = <String, dynamic>{
+      'buddyId': buddyId,
+      'chatRoomId': chatRoomId,
+      'score': score,
+      if (comment != null && comment.isNotEmpty) 'comment': comment,
+    };
+
+    final res = await _dio.post('/api/ratings', data: body);
+
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(
+        'Failed to submit rating: ${res.statusCode} ${res.statusMessage}',
+      );
+    }
+  }
+
+  /// 마이페이지용: 내가 받은 평점 요약 조회
+  ///
+  /// GET /api/profile/rating-summary
+  /// -> { average, totalCount, count1, ..., count5 }
+  Future<Map<String, dynamic>> fetchMyRatingSummary() async {
+    final res = await _dio.get('/api/profile/rating-summary');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected rating summary response format');
+    }
+
+    throw Exception(
+      'Failed to load rating summary: ${res.statusCode} ${res.statusMessage}',
+    );
   }
 }

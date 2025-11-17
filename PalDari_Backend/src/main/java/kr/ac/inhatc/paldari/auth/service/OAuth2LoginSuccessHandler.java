@@ -31,20 +31,25 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
 
-        // CustomOidcUserService에서 nameAttributeKey = "email" 로 설정했으므로
+        // 👇 기존: email = authentication.getName()
         String email = authentication.getName();
 
-        String accessToken = jwtTokenProvider.generateAccessToken(email);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(email);
+        // ⚠️ 이메일로 유저 찾기
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("OAuth2 user not found in DB: " + email));
 
-        // DB에 refresh 토큰 저장
-        userRepository.findByEmail(email).ifPresent(user -> {
-            user.setRefreshToken(refreshToken);
-            user.setRefreshTokenExpiry(LocalDateTime.now().plusDays(7));
-            userRepository.save(user);
-        });
+        // ⭐ 토큰 subject를 email이 아니라 username으로 통일
+        String username = user.getUsername();
 
-        // Flutter 웹으로 두 토큰 전달
+        // ⭐ 토큰 발급: sub = username
+        String accessToken = jwtTokenProvider.generateAccessToken(username);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(username);
+
+        // refresh 저장
+        user.setRefreshToken(refreshToken);
+        user.setRefreshTokenExpiry(LocalDateTime.now().plusDays(7));
+        userRepository.save(user);
+
         String redirectUrl = redirectBase
                 + "?access=" + URLEncoder.encode(accessToken, StandardCharsets.UTF_8)
                 + "&refresh=" + URLEncoder.encode(refreshToken, StandardCharsets.UTF_8);
@@ -52,4 +57,3 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
         response.sendRedirect(redirectUrl);
     }
 }
-
