@@ -13,7 +13,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final emailCtrl = TextEditingController();
   final pwCtrl = TextEditingController();
   final pwConfirmCtrl = TextEditingController();
-  final ageCtrl = TextEditingController();
+  final ageCtrl = TextEditingController(); // 생년월일 입력용 (YYYY-MM-DD)
 
   final _formKey = GlobalKey<FormState>();
   final _idFocus = FocusNode();
@@ -104,11 +104,12 @@ class _SignupScreenState extends State<SignupScreen> {
     return null;
   }
 
-  String? _validateAge(String? v) {
+  /// 생년월일: 선택사항, 입력 시에는 YYYY-MM-DD 형식 강제
+  String? _validateBirthdate(String? v) {
     final s = (v ?? '').trim();
     if (s.isEmpty) return null; // 선택사항
-    final n = int.tryParse(s);
-    if (n == null || n < 0) return '나이는 숫자로 입력해 주세요.';
+    final re = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    if (!re.hasMatch(s)) return '생년월일은 YYYY-MM-DD 형식으로 입력해 주세요.';
     return null;
   }
 
@@ -116,11 +117,32 @@ class _SignupScreenState extends State<SignupScreen> {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
 
-    // 기존 기능 유지: username, email, password만 전달
+    // 🔹 Gender 코드 변환 (백엔드에서 코드로 쓸 때 대비)
+    String? genderCode;
+    switch (_gender) {
+      case '남성':
+        genderCode = 'MALE';
+        break;
+      case '여성':
+        genderCode = 'FEMALE';
+        break;
+      case '기타':
+        genderCode = 'OTHER';
+        break;
+      default:
+        genderCode = null; // '선택 안함'이면 null
+    }
+
+    // 🔹 Birthdate (선택) — 이미 validator에서 YYYY-MM-DD 형식 체크
+    final bdText = ageCtrl.text.trim();
+    final birthdate = bdText.isEmpty ? null : bdText;
+
     await context.read<AuthState>().signup(
       idCtrl.text.trim(),
       emailCtrl.text.trim(),
       pwCtrl.text.trim(),
+      gender: genderCode,
+      birthdate: birthdate,
     );
 
     if (!mounted) return;
@@ -292,16 +314,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                                 SizedBox(height: 12 * scale),
 
-                                // (만)나이 + 성별 (선택사항)
+                                // 생년월일 + 성별 (선택사항)
                                 Row(
                                   children: [
                                     Expanded(
                                       child: TextFormField(
                                         controller: ageCtrl,
-                                        keyboardType: TextInputType.number,
-                                        decoration:
-                                        _rectField('생년월일 (선택)'),
-                                        validator: _validateAge,
+                                        keyboardType: TextInputType.datetime,
+                                        decoration: _rectField(
+                                            '생년월일 (선택, YYYY-MM-DD)'),
+                                        validator: _validateBirthdate,
                                       ),
                                     ),
                                     SizedBox(width: 12 * scale),

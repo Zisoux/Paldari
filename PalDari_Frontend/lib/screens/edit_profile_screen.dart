@@ -22,7 +22,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const brown = Color(0xFF734124);
   static const chipBg = Color(0xFFF5E4D6);
 
-  // ===================== 태그 옵션 =====================
+  // ===================== 태그 / 언어 옵션 =====================
 
   /// 마이페이지에서 사용할 고정 태그 (최대 5개 선택)
   /// 코드는 서버/DB에서 사용하기 좋게 영문으로, 라벨은 한글로.
@@ -32,6 +32,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'REGION': '지역',
     'JOB': '취업',
     'SAFETY': '안전',
+  };
+
+  /// 구사 언어 옵션
+  /// code -> label
+  /// (향후 백엔드에서도 같은 코드값을 기준으로 Enum/상수 등으로 맞춰주면 좋음)
+  static const Map<String, String> _languageOptions = {
+    'ko': '한국어',
+    'en': 'English',
+    'ja': '日本語',
+    'zh': '中文',
+    'ms': 'Bahasa Melayu',
+    'fr': 'Français',
+    'de': 'Deutsch',
   };
 
   /// 국가별 "출신 지역" 리스트 (라벨 그대로 저장)
@@ -220,8 +233,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   DateTime? _birthdate;
 
   /// 태그는 코드(LIFE/…),
+  /// 구사 언어는 코드(ko/en/…) ,
   /// 지역은 라벨 그대로 저장 (예: 'Kuala Lumpur', '서울')
   Set<String> _tags = {};
+  Set<String> _languages = {};
   Set<String> _regions = {};
 
   bool _loading = false;
@@ -261,6 +276,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final rawTags = p['tags'];
         _tags = _parseCodes(rawTags, _tagOptions, maxCount: 5);
 
+        // 구사 언어: ["ko","en"] / "ko,en" / ["한국어","English"] 모두 처리
+        final rawLanguages = p['languages'];
+        _languages = _parseCodes(rawLanguages, _languageOptions, maxCount: 5);
+
         // 지역: ["Kuala Lumpur","서울"] / "Kuala Lumpur,서울" 모두 처리
         final rawRegions = p['regions'];
         _regions = _parseRegions(rawRegions, maxCount: 5);
@@ -277,7 +296,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // ===================== 매핑 유틸 =====================
 
-  /// 태그용: 라벨 또는 코드를 받아서 "코드"로 변환
+  /// 태그/언어용: 라벨 또는 코드를 받아서 "코드"로 변환
   String? _toCode(String value, Map<String, String> options) {
     if (value.isEmpty) return null;
 
@@ -292,7 +311,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return found.key.isEmpty ? null : found.key;
   }
 
-  /// 서버에서 온 값(raw)을 Set<code>로 변환 (태그용)
+  /// 서버에서 온 값(raw)을 Set<code>로 변환 (태그/언어용 공통)
   Set<String> _parseCodes(
       dynamic raw,
       Map<String, String> options, {
@@ -389,8 +408,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     // 서버에 보낼 때
     // - 태그: 코드 리스트
+    // - 구사 언어: 코드 리스트
     // - 지역: 라벨 문자열 리스트
     final tagCodes = _tags.toList();
+    final languageCodes = _languages.toList();
     final regionLabels = _regions.toList();
 
     final ok = await context.read<AuthState>().updateProfileBasic(
@@ -399,6 +420,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       livingIn: _livingInCtrl.text.trim(),
       introduction: _introCtrl.text.trim(),
       tags: tagCodes,
+      languages: languageCodes, // ✅ 새로 추가 (AuthState에도 반영 필요)
       regions: regionLabels,
     );
 
@@ -434,7 +456,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  /// 멀티 선택 칩 영역 (태그용)
+  /// 멀티 선택 칩 영역 (태그/언어용)
   Widget _buildMultiChipGroup({
     required Map<String, String> options,
     required Set<String> selectedValues,
@@ -504,8 +526,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 20),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -572,12 +594,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                         const SizedBox(height: 20),
 
-                        // ========= 섹션: 태그 & 지역 =========
-                        _buildSectionTitle(Icons.sell, '관심 태그 & 활동 지역'),
+                        // ========= 섹션: 태그 & 언어 & 지역 =========
+                        _buildSectionTitle(Icons.sell, '관심 태그 & 구사 언어 & 활동 지역'),
                         const SizedBox(height: 10),
 
                         const Text(
-                          '마이페이지에 표시될 태그와 지역을 선택해 주세요.\n'
+                          '마이페이지에 표시될 태그, 구사 언어, 지역을 선택해 주세요.\n'
                               '각 항목은 최대 5개까지 선택할 수 있어요.',
                           style: TextStyle(
                             fontSize: 12,
@@ -585,6 +607,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+
+                        // 구사 언어
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              '구사 언어',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${_languages.length}/5',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        _buildMultiChipGroup(
+                          options: _languageOptions,
+                          selectedValues: _languages,
+                          onToggle: (code) {
+                            setState(() {
+                              if (_languages.contains(code)) {
+                                _languages.remove(code);
+                              } else {
+                                if (_languages.length >= 5) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                      Text('구사 언어는 최대 5개까지 선택할 수 있어요.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _languages.add(code);
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
 
                         // 관심 태그
                         Row(
@@ -705,8 +772,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         materialTapTargetSize:
                                         MaterialTapTargetSize
                                             .shrinkWrap,
-                                        padding:
-                                        const EdgeInsets.symmetric(
+                                        padding: const EdgeInsets
+                                            .symmetric(
                                           horizontal: 8,
                                           vertical: 0,
                                         ),

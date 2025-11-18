@@ -93,9 +93,7 @@ class ApiService {
     if (res.statusCode == 200) {
       final data = res.data;
       if (data is List) {
-        return data
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
       throw Exception('Unexpected home pals response format: $data');
     }
@@ -105,7 +103,6 @@ class ApiService {
     );
   }
 
-
   // ========== POSTS ==========
 
   Future<List<Map<String, dynamic>>> fetchPosts() async {
@@ -113,9 +110,7 @@ class ApiService {
     if (res.statusCode == 200) {
       final data = res.data;
       if (data is List) {
-        return data
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
       throw Exception('Unexpected posts response format');
     }
@@ -209,7 +204,8 @@ class ApiService {
 
   /// 🔥 첨부파일 삭제 (작성자 본인만 가능)
   Future<void> deleteAttachment(int postId, int attachmentId) async {
-    final res = await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
+    final res =
+    await _dio.delete('/api/posts/$postId/attachments/$attachmentId');
     if (res.statusCode != 204 && res.statusCode != 200) {
       throw Exception(
         'Failed to delete attachment: ${res.statusCode} ${res.statusMessage}',
@@ -225,9 +221,7 @@ class ApiService {
       if (res.statusCode == 200) {
         final data = res.data;
         if (data is List) {
-          return data
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
+          return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         }
       }
       return [];
@@ -238,7 +232,10 @@ class ApiService {
     }
   }
 
-  Future<void> createComment(int postId, {required String content}) async {
+  Future<void> createComment(
+      int postId, {
+        required String content,
+      }) async {
     final res = await _dio.post(
       '/api/posts/$postId/comments',
       data: {'content': content},
@@ -309,9 +306,7 @@ class ApiService {
     if (res.statusCode == 200) {
       final data = res.data;
       if (data is List) {
-        return data
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
       throw Exception('Unexpected matching response format: ${res.data}');
     }
@@ -473,6 +468,98 @@ class ApiService {
       targetLang: targetLang,
     );
   }
+
+  // ========== PROFILE (마이페이지 / 공개 프로필 공통) ==========
+
+  /// 내 프로필 상세 조회 (마이페이지용)
+  ///
+  /// GET /api/profile/me
+  /// 예시 응답:
+  /// {
+  ///   "nickname": "...",
+  ///   "gender": "...",
+  ///   "birthdate": "2000-01-01",
+  ///   "country": "대한민국",
+  ///   "livingIn": "서울",
+  ///   "language": "한국어",
+  ///   "introduction": "...",
+  ///   "tags": ["LIFE", "STUDY"],
+  ///   "regions": ["Seoul", "Incheon"]
+  /// }
+  Future<Map<String, dynamic>> fetchMyProfileDetail() async {
+    final res = await _dio.get('/api/profile/me');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected profile detail response format');
+    }
+
+    throw Exception(
+      'Failed to load profile detail: ${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
+  /// 다른 유저 공개 프로필 조회 (Pal 프로필 화면용)
+  ///
+  /// GET /api/profile/{userId}
+  Future<Map<String, dynamic>> fetchUserProfileDetail({
+    required int userId,
+  }) async {
+    final res = await _dio.get('/api/profile/$userId');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected user profile detail response format');
+    }
+
+    throw Exception(
+      'Failed to load user profile: ${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
+  /// 내 프로필 기본정보 수정
+  ///
+  /// PATCH /api/profile/update
+  /// - null 로 보내지 않는 필드만 수정
+  /// - tags / regions:
+  ///   - null  : 건드리지 않음
+  ///   - []    : 모두 삭제
+  Future<void> updateMyProfileBasic({
+    String? gender,
+    String? birthdate, // "yyyy-MM-dd"
+    String? country,
+    String? livingIn,
+    List<String>? languages,
+    String? introduction,
+    List<String>? tags,
+    List<String>? regions,
+  }) async {
+    final body = <String, dynamic>{};
+
+    if (gender != null) body['gender'] = gender;
+    if (birthdate != null) body['birthdate'] = birthdate;
+    if (country != null) body['country'] = country;
+    if (livingIn != null) body['livingIn'] = livingIn;
+    if (languages != null) body['languages'] = languages;
+    if (introduction != null) body['introduction'] = introduction;
+    if (tags != null) body['tags'] = tags;
+    if (regions != null) body['regions'] = regions;
+
+    final res = await _dio.patch('/api/profile/update', data: body);
+
+    if (res.statusCode != 200) {
+      throw Exception(
+        'Failed to update profile: ${res.statusCode} ${res.statusMessage}',
+      );
+    }
+  }
+
   // ========== RATINGS ==========
 
   /// 채팅방에서 Buddy 평점 남기기

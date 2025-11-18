@@ -113,8 +113,6 @@ public class MatchingService {
             }
 
             // --- ⑤ 나이 범위 (TODO) ---
-            // User 엔티티에 birthdate/birthYear 등이 있으면 여기에서
-            // age 계산해서 minAge/maxAge 범위 안에 들어가면 점수 추가해주면 됨.
 
             // 최소 하나라도 조건이 맞으면 후보로 인정
             if (score > 0) {
@@ -150,10 +148,16 @@ public class MatchingService {
     // ===================== 채팅방 생성/조회 =====================
 
     public ChatRoomResponse createOrGetChatRoom(Long currentUserId, Long targetUserId) {
-        User me = userRepository.findById(currentUserId)
-                .orElseThrow(() -> new IllegalArgumentException("내 사용자 정보를 찾을 수 없습니다."));
-        User target = userRepository.findById(targetUserId)
-                .orElseThrow(() -> new IllegalArgumentException("상대 사용자 정보를 찾을 수 없습니다."));
+        // 🔹 currentUserId / targetUserId 가 "DB PK"이거나,
+        //    "숫자로 된 username(예: 1113)" 둘 다 처리할 수 있게 보강
+        User me = findUserByIdOrNumericUsername(
+                currentUserId,
+                "내 사용자 정보를 찾을 수 없습니다."
+        );
+        User target = findUserByIdOrNumericUsername(
+                targetUserId,
+                "상대 사용자 정보를 찾을 수 없습니다."
+        );
 
         // 1) 이미 둘 사이에 방이 있으면 그거 재사용
         Optional<ChatRoom> existing =
@@ -231,5 +235,25 @@ public class MatchingService {
         return gender;
     }
 
+    /**
+     * id 로 먼저 찾고, 없으면 "숫자 username" 으로 한 번 더 찾는 헬퍼
+     * - currentUserId 가 3 (PK) 여도 동작
+     * - currentUserId 가 1113 (username) 여도 동작
+     */
+    private User findUserByIdOrNumericUsername(Long value, String errorMessage) {
+        if (value == null) {
+            throw new IllegalArgumentException(errorMessage);
+        }
 
+        // 1) 우선 PK(id) 기준으로 시도
+        Optional<User> byId = userRepository.findById(value);
+        if (byId.isPresent()) {
+            return byId.get();
+        }
+
+        // 2) 없으면 "value를 문자열로 본 username" 기준으로 시도
+        String username = String.valueOf(value);
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException(errorMessage));
+    }
 }

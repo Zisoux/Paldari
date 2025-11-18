@@ -1,4 +1,6 @@
+// lib/providers/auth_provider.dart
 import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -37,12 +39,14 @@ class AuthState with ChangeNotifier {
   bool allowMatching = true;
   bool realtimeTranslation = false;
 
-  // ===== 태그 / 지역 =====
+  // ===== 태그 / 지역 / 구사 언어 =====
   List<String>? _tags;
   List<String>? _regions;
+  List<String>? _languages; // 프로필 basic의 구사 언어 (배열)
 
   List<String> get tags => _tags ?? const <String>[];
   List<String> get regions => _regions ?? const <String>[];
+  List<String> get languages => _languages ?? const <String>[];
 
   // ===== 생성자 =====
   AuthState() {
@@ -100,6 +104,7 @@ class AuthState with ChangeNotifier {
         await reloadSettings(silent: true);
         await reloadTags(silent: true);
         await reloadRegions(silent: true);
+        // _languages는 /api/profile/basic 응답(profile)에 포함된 걸 사용
       }
     }
 
@@ -141,6 +146,7 @@ class AuthState with ChangeNotifier {
     profile = null;
     _tags = const <String>[];
     _regions = const <String>[];
+    _languages = const <String>[];
     // 환경 설정은 디폴트로 초기화
     allowNotification = true;
     allowMatching = true;
@@ -172,12 +178,24 @@ class AuthState with ChangeNotifier {
 
   // ===== 회원가입 / 로그인 / 로그아웃 =====
 
-  Future<void> signup(String u, String e, String p) async {
+  Future<void> signup(
+      String u,
+      String e,
+      String p, {
+        String? gender,      // ✅ 추가
+        String? birthdate,   // ✅ 추가
+      }) async {
     loading = true;
     error = null;
     notifyListeners();
     try {
-      await _auth.signup(username: u, email: e, password: p);
+      await _auth.signup(
+        username: u,
+        email: e,
+        password: p,
+        gender: gender,
+        birthdate: birthdate,
+      );
     } catch (e) {
       error = e.toString();
     } finally {
@@ -520,17 +538,30 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  // ===== Profile Basic (gender, birthdate, country, livingIn, language, introduction, tags, regions) =====
+  // ===== Profile Basic (gender, birthdate, livingIn, introduction, tags, languages, regions) =====
 
   Future<Map<String, dynamic>?> fetchProfileBasic() async {
     if (!isLoggedIn) return null;
     try {
       final res = await _api.dio.get('/api/profile/basic');
       if (res.data is Map<String, dynamic>) {
+        final data = res.data as Map<String, dynamic>;
+
         // 전체 profile에도 병합해두면 앱 전반에서 동일하게 참조 가능
-        profile = {...?profile, ...res.data as Map<String, dynamic>};
+        profile = {...?profile, ...data};
+
+        // languages 필드가 있다면 _languages에 캐시
+        final langs = data['languages'];
+        if (langs is List) {
+          _languages =
+              langs.map((e) => e.toString()).toList();
+        } else if (langs is String) {
+          _languages =
+              langs.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        }
+
         notifyListeners();
-        return res.data as Map<String, dynamic>;
+        return data;
       }
     } catch (e) {
       debugPrint('fetchProfileBasic failed: $e');
@@ -539,14 +570,13 @@ class AuthState with ChangeNotifier {
   }
 
   Future<bool> updateProfileBasic({
-    String? gender,          // "MALE"/"FEMALE"/"OTHER" 등 문자열
-    DateTime? birthdate,     // null 아니면 yyyy-MM-dd로 변환
-    String? country,
+    String? gender,
+    DateTime? birthdate,
     String? livingIn,
-    String? language,
     String? introduction,
-    List<String>? tags,      // 🔹 태그: 코드 (예: LIFE, STUDY)
-    List<String>? regions,   // 🔹 지역: 라벨 문자열 (예: "Seoul", "Paris")
+    List<String>? tags,
+    List<String>? languages, // ✅ 구사 언어 (복수)
+    List<String>? regions,
   }) async {
     if (!isLoggedIn) return false;
 
@@ -558,22 +588,35 @@ class AuthState with ChangeNotifier {
       final d = birthdate.day.toString().padLeft(2, '0');
       payload['birthdate'] = '$y-$m-$d';
     }
-    if (country != null) payload['country'] = country;
     if (livingIn != null) payload['livingIn'] = livingIn;
-    if (language != null) payload['language'] = language;
     if (introduction != null) payload['introduction'] = introduction;
 
-    // 🔹 태그 / 지역도 같이 보냄 (백엔드 DTO에 맞게 필드명 사용)
+    // 🔹 태그 / 구사 언어 / 지역
     if (tags != null) payload['tags'] = tags;
+    if (languages != null) payload['languages'] = languages;
     if (regions != null) payload['regions'] = regions;
 
     if (payload.isEmpty) return true;
 
     try {
-      final res = await _api.dio.patch('/api/profile/basic', data: payload);
+      final res =
+      await _api.dio.patch('/api/profile/basic', data: payload);
       if (res.data is Map<String, dynamic>) {
+        final data = res.data as Map<String, dynamic>;
+
         // 성공 시 로컬 캐시 갱신
-        profile = {...?profile, ...res.data as Map<String, dynamic>};
+        profile = {...?profile, ...data};
+
+        // 응답에 languages가 있으면 _languages 업데이트
+        final langs = data['languages'];
+        if (langs is List) {
+          _languages =
+              langs.map((e) => e.toString()).toList();
+        } else if (langs is String) {
+          _languages =
+              langs.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        }
+
         notifyListeners();
         return true;
       }

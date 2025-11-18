@@ -51,15 +51,58 @@ public class UserProfileService {
                 .map(UserRegion::getRegion)
                 .collect(Collectors.toList());
 
+        // 🔹 "ko,en,ja" -> ["ko","en","ja"]
+        List<String> languages = null;
+        String langRaw = u.getLanguage();
+        if (langRaw != null && !langRaw.trim().isEmpty()) {
+            languages = List.of(langRaw.split("\\s*,\\s*")); // 콤마 기준 split
+        }
+
         ProfileBasicDto dto = new ProfileBasicDto();
         dto.setGender(emptyToNull(u.getGender()));
         dto.setBirthdate(u.getBirthdate() == null ? null : u.getBirthdate().toString()); // yyyy-MM-dd
         dto.setCountry(emptyToNull(u.getCountry()));
         dto.setLivingIn(emptyToNull(u.getLivingIn()));
-        dto.setLanguage(emptyToNull(u.getLanguage()));
+        dto.setLanguages(languages); // ✅ 리스트만 사용
         dto.setIntroduction(emptyToNull(u.getIntroduction()));
 
-        // 🔹 추가된 필드 세팅
+        dto.setTags(tags);
+        dto.setRegions(regions);
+
+        return dto;
+    }
+
+    /**
+     * 공개 프로필 조회 (userId 기준)
+     * - username 없이 userId 로 접근
+     * - 기본 정보 + 태그/지역을 ProfileBasicDto 로 반환
+     */
+    public ProfileBasicDto getPublicProfile(Long userId) {
+        User u = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        List<String> tags = tagRepository.findByUser(u).stream()
+                .map(UserTag::getTag)
+                .collect(Collectors.toList());
+
+        List<String> regions = regionRepository.findByUser(u).stream()
+                .map(UserRegion::getRegion)
+                .collect(Collectors.toList());
+
+        // 🔹 공개 프로필에도 동일하게 언어 리스트 세팅
+        List<String> languages = null;
+        String langRaw = u.getLanguage();
+        if (langRaw != null && !langRaw.trim().isEmpty()) {
+            languages = List.of(langRaw.split("\\s*,\\s*"));
+        }
+
+        ProfileBasicDto dto = new ProfileBasicDto();
+        dto.setGender(emptyToNull(u.getGender()));
+        dto.setBirthdate(u.getBirthdate() == null ? null : u.getBirthdate().toString()); // yyyy-MM-dd
+        dto.setCountry(emptyToNull(u.getCountry()));
+        dto.setLivingIn(emptyToNull(u.getLivingIn()));
+        dto.setIntroduction(emptyToNull(u.getIntroduction()));
+        dto.setLanguages(languages);   // ✅ 리스트만 사용
         dto.setTags(tags);
         dto.setRegions(regions);
 
@@ -82,8 +125,6 @@ public class UserProfileService {
             if (b == null) {
                 u.setBirthdate(null);
             } else {
-                // 형식 검증: 잘못된 형식이면 IllegalArgumentException 던져서 400으로 매핑되게 하거나
-                // GlobalExceptionHandler에서 메시지 변환
                 try {
                     u.setBirthdate(LocalDate.parse(b)); // ISO yyyy-MM-dd
                 } catch (DateTimeParseException e) {
@@ -97,17 +138,30 @@ public class UserProfileService {
         if (req.getLivingIn() != null) {
             u.setLivingIn(emptyToNull(req.getLivingIn()));
         }
-        if (req.getLanguage() != null) {
-            u.setLanguage(emptyToNull(req.getLanguage()));
-        }
+        // ✅ 대표 언어 단일 필드 제거 (req.getLanguage()는 더 이상 사용 X)
+
         if (req.getIntroduction() != null) {
             u.setIntroduction(emptyToNull(req.getIntroduction()));
         }
 
-        // ----- 태그 업데이트 (정책: 태그 = 코드, 문자열 그대로 보관) -----
-        // null  : 태그 변경 안 함
-        // []    : 기존 태그 모두 삭제
-        // [..]  : 기존 태그 모두 지우고, 새 리스트로 교체
+        // ✅ 구사 언어 리스트 업데이트
+        // null  : 언어 변경 안 함
+        // []    : 기존 언어 모두 삭제
+        // [..]  : 콤마로 join 해서 저장
+        if (req.getLanguages() != null) {
+            if (req.getLanguages().isEmpty()) {
+                u.setLanguage(null);
+            } else {
+                String joined = req.getLanguages().stream()
+                        .filter(s -> s != null && !s.trim().isEmpty())
+                        .map(String::trim)
+                        .distinct()
+                        .collect(Collectors.joining(","));
+                u.setLanguage(joined); // 예: "ko,en,ja"
+            }
+        }
+
+        // ----- 태그 업데이트 -----
         if (req.getTags() != null) {
             List<String> normTags = req.getTags().stream()
                     .filter(t -> t != null && !t.trim().isEmpty())
@@ -115,22 +169,18 @@ public class UserProfileService {
                     .distinct()
                     .collect(Collectors.toList());
 
-            // 기존 태그 전체 삭제 후 다시 저장
             List<UserTag> existing = tagRepository.findByUser(u);
             tagRepository.deleteAll(existing);
 
             for (String t : normTags) {
                 UserTag ut = new UserTag();
                 ut.setUser(u);
-                ut.setTag(t); // "LIFE", "STUDY" 같은 코드 그대로 저장
+                ut.setTag(t);
                 tagRepository.save(ut);
             }
         }
 
-        // ----- 지역 업데이트 (정책: 지역 = 라벨 문자열 그대로 보관) -----
-        // null  : 지역 변경 안 함
-        // []    : 기존 지역 모두 삭제
-        // [..]  : 기존 지역 모두 지우고, 새 리스트로 교체
+        // ----- 지역 업데이트 -----
         if (req.getRegions() != null) {
             List<String> normRegions = req.getRegions().stream()
                     .filter(r -> r != null && !r.trim().isEmpty())
@@ -138,14 +188,13 @@ public class UserProfileService {
                     .distinct()
                     .collect(Collectors.toList());
 
-            // 기존 지역 전체 삭제 후 다시 저장
             List<UserRegion> existingRegions = regionRepository.findByUser(u);
             regionRepository.deleteAll(existingRegions);
 
             for (String r : normRegions) {
                 UserRegion ur = new UserRegion();
                 ur.setUser(u);
-                ur.setRegion(r); // "Seoul", "Kuala Lumpur" 같은 라벨 문자열 그대로 저장
+                ur.setRegion(r);
                 regionRepository.save(ur);
             }
         }
@@ -166,7 +215,6 @@ public class UserProfileService {
                     return settingsRepository.save(ns);
                 });
 
-        // boolean primitive만 담으므로 Map.of 사용 안전
         return Map.of(
                 "allowNotification", s.isAllowNotification(),
                 "allowMatching", s.isAllowMatching(),

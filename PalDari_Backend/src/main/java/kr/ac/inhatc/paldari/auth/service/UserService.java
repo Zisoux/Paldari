@@ -12,7 +12,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
@@ -51,7 +53,13 @@ public class UserService implements UserDetailsService {
     // ================= 회원가입 / 이메일 인증 =================
 
     @Transactional
-    public void registerLocalUser(String username, String email, String rawPassword) {
+    public void registerLocalUser(
+            String username,
+            String email,
+            String rawPassword,
+            String gender,      // ✅ 추가
+            String birthdate    // ✅ 추가 ("yyyy-MM-dd")
+    ) {
         if (userRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("Username already exists");
         }
@@ -68,6 +76,19 @@ public class UserService implements UserDetailsService {
                 "ROLE_USER",
                 LocalDateTime.now()
         );
+        // ✅ 성별 세팅 (null/공백이면 무시)
+        if (gender != null && !gender.trim().isEmpty()) {
+            user.setGender(gender.trim());
+        }
+
+        // ✅ 생년월일 세팅 ("yyyy-MM-dd" 형식)
+        if (birthdate != null && !birthdate.trim().isEmpty()) {
+            try {
+                user.setBirthdate(LocalDate.parse(birthdate.trim()));
+            } catch (DateTimeParseException e) {
+                throw new IllegalArgumentException("Invalid birthdate format (expected yyyy-MM-dd): " + birthdate);
+            }
+        }
         userRepository.save(user);
 
         String token = generateToken();

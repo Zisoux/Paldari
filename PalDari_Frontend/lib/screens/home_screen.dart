@@ -1,5 +1,7 @@
+// lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:paldari/screens/settings_screen.dart';
+import 'package:paldari/screens/pal_profile_screen.dart'; // ✅ Pal 프로필 화면
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -402,7 +404,8 @@ class _PalListSectionState extends State<_PalListSection> {
             ),
           )
               : ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+            padding:
+            const EdgeInsets.fromLTRB(16, 12, 16, 120),
             children: [
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -444,7 +447,8 @@ class _ActiveFilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(right: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(999),
@@ -489,7 +493,13 @@ class PalCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
-        // TODO: 여기서 Pal 상세 or 채팅방으로 이동
+        // ✅ Pal 카드 탭 시 상대 프로필 화면으로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PalProfileScreen(pal: pal),
+          ),
+        );
       },
       child: Ink(
         decoration: BoxDecoration(
@@ -518,7 +528,8 @@ class PalCard extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
@@ -560,8 +571,9 @@ class PalCard extends StatelessWidget {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children:
-                      pal.tags.map((t) => _TagChip(t)).toList(),
+                      children: pal.tags
+                          .map((t) => _TagChip(t))
+                          .toList(),
                     ),
                   ],
                 ),
