@@ -145,7 +145,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final currentUser = auth.username ?? '';
 
     final locale = Localizations.localeOf(context);
-    final targetLang = locale.languageCode;
+    final targetLang = 'ko';// locale.languageCode; -- 기존 앱 설정 따르기
 
     for (final m in _messages) {
       if (m.type != 'TALK') continue;
@@ -153,8 +153,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (m.translatedContent != null) continue;
 
       try {
-        final translated = await _api.autoTranslate(
+        final translated = await _api.translateText(
           text: m.content,
+          sourceLang: 'auto',
           targetLang: targetLang,
         );
 
@@ -261,8 +262,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       final locale = Localizations.localeOf(context);
       final targetLang = locale.languageCode;
 
-      final translated = await _api.autoTranslate(
+      final translated = await _api.translateText(
         text: msg.content,
+        sourceLang: 'auto',
         targetLang: targetLang,
       );
 
