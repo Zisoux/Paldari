@@ -2,11 +2,10 @@ package kr.ac.inhatc.paldari.chats.controller;
 
 import kr.ac.inhatc.paldari.auth.entity.User;
 import kr.ac.inhatc.paldari.auth.repository.UserRepository;
+import kr.ac.inhatc.paldari.chats.dto.ChatRoomResponse;
 import kr.ac.inhatc.paldari.chats.entity.ChatMessage;
-import kr.ac.inhatc.paldari.chats.entity.ChatRoom;
 import kr.ac.inhatc.paldari.chats.repository.ChatMessageRepository;
-import kr.ac.inhatc.paldari.chats.repository.ChatRoomMemberRepository;
-import kr.ac.inhatc.paldari.chats.repository.ChatRoomRepository;
+import kr.ac.inhatc.paldari.chats.service.ChatService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +20,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/chat")
 public class ChatController {
 
-    private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final ChatRoomMemberRepository chatRoomMemberRepository;
-    private final UserRepository userRepository;    // 🔹 currentUserId에서 사용
+    private final ChatService chatService;
+    private final UserRepository userRepository;   // 🔹 currentUserId에서 사용
 
     /**
      * 내가 속한 채팅방 목록
@@ -32,17 +30,8 @@ public class ChatController {
      */
     @GetMapping("/rooms")
     public List<ChatRoomResponse> getMyRooms(Authentication authentication) {
-        Long meId = currentUserId(authentication);   // 🔹 여기서 헬퍼 사용
-
-        List<ChatRoom> rooms = chatRoomMemberRepository.findRoomsByUserId(meId);
-
-        return rooms.stream()
-                .map(r -> new ChatRoomResponse(
-                        r.getId(),
-                        r.getName(),
-                        r.getSubText() != null ? r.getSubText() : ""
-                ))
-                .collect(Collectors.toList());
+        Long meId = currentUserId(authentication);   // 🔹 공통 헬퍼 사용
+        return chatService.getMyRooms(meId);
     }
 
     /**
@@ -74,37 +63,36 @@ public class ChatController {
     // ====== 공통 헬퍼 메서드 ======
 
     /**
-     * Authentication에서 username을 꺼내서 User id로 변환
-     * (MatchingController에 이미 있는 currentUserId와 동일한 방식으로 맞춰줘)
+     * Authentication에서 username을 꺼내서 "DB상의 user PK(id)"로 변환
+     * - name 이 "1113" 같은 username이면: username 기준으로 찾고 → id 반환
+     * - name 이 "3" 같은 PK 문자열이면: id로 찾고 → id 반환
      */
     private Long currentUserId(Authentication authentication) {
         if (authentication == null) {
             throw new IllegalStateException("인증 정보가 없습니다.");
         }
 
-        String name = authentication.getName(); // "3" 또는 "admin" 같은 값
+        String name = authentication.getName(); // "1113" 또는 "3" 등
 
-        // 1) 먼저 숫자로 파싱을 시도해보고
+        // 1) username 기준으로 먼저 조회 (우리 user 테이블에서 username=1113)
+        var byUsername = userRepository.findByUsername(name);
+        if (byUsername.isPresent()) {
+            return byUsername.get().getId();    // 실제 PK (예: 3)
+        }
+
+        // 2) username으로도 못 찾으면, 숫자로 파싱 → id 기준으로 조회
         try {
-            return Long.parseLong(name);
-        } catch (NumberFormatException ignored) {
-            // 2) 안 되면 -> username 으로 DB 조회
-            return userRepository.findByUsername(name)
+            Long id = Long.parseLong(name);
+            User user = userRepository.findById(id)
                     .orElseThrow(() ->
-                            new IllegalStateException("사용자를 찾을 수 없습니다: " + name))
-                    .getId();
+                            new IllegalStateException("사용자를 찾을 수 없습니다: " + name));
+            return user.getId();
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("사용자를 찾을 수 없습니다: " + name);
         }
     }
 
     // ====== DTO ======
-
-    @Data
-    @AllArgsConstructor
-    public static class ChatRoomResponse {
-        private Long id;
-        private String name;
-        private String subText;   // 🔹 Flutter에서 쓰고 있으니 포함
-    }
 
     @Data
     @AllArgsConstructor

@@ -104,7 +104,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
     final lang = (pal['language'] ?? '').toString();
     final intro = (pal['introduction'] ?? '').toString();
 
-    final targetUserId = pal['id'] ?? pal['userId'];
+    final targetUserId = pal['id'];
     if (targetUserId == null) {
       // 백엔드 응답 형식이 바뀌어서 id가 없으면 그냥 안내만
       ScaffoldMessenger.of(context).showSnackBar(

@@ -88,6 +88,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/ratings/**").authenticated()
                         // 채팅 API는 인증 필요
                         .requestMatchers("/api/chat/**").authenticated()
+                        // 🔹 공개 프로필 조회도 로그인 유저만 접근 (GET /api/profile/public/**)
+                        .requestMatchers("/api/profile/public/**").authenticated()
                         // 프로필 관련은 인증 필요 (rating-summary 포함)
                         .requestMatchers("/api/profile/**").authenticated()
                         // 나머지는 전부 인증 필요

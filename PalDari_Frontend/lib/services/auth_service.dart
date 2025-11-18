@@ -16,15 +16,26 @@ class AuthService {
     required String username,
     required String email,
     required String password,
+    String? gender,      // ✅ 추가
+    String? birthdate,   // ✅ 추가 (yyyy-MM-dd 문자열)
   }) async {
     try {
+      final body = <String, dynamic>{
+        'username': username,
+        'email': email,
+        'password': password,
+      };
+
+      if (gender != null && gender.isNotEmpty) {
+        body['gender'] = gender;
+      }
+      if (birthdate != null && birthdate.isNotEmpty) {
+        body['birthdate'] = birthdate;
+      }
+
       final res = await _dio.post(
         '/api/auth/signup',
-        data: {
-          'username': username,
-          'email': email,
-          'password': password,
-        },
+        data: body,
       );
 
       if (res.statusCode != 200) {

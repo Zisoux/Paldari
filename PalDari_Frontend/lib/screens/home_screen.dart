@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:paldari/screens/settings_screen.dart';
+import 'package:paldari/screens/pal_profile_screen.dart'; // ✅ Pal 프로필 화면
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
@@ -532,7 +533,13 @@ class PalCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () {
-        // TODO: 여기서 Pal 상세 or 채팅방으로 이동
+        // ✅ Pal 카드 탭 시 상대 프로필 화면으로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PalProfileScreen(pal: pal),
+          ),
+        );
       },
       child: Ink(
         decoration: BoxDecoration(

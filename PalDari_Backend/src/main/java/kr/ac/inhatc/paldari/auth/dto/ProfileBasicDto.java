@@ -14,7 +14,7 @@ public class ProfileBasicDto {
     private String birthdate;     // "yyyy-MM-dd" or null
     private String country;       // 국적 (예: "KR")
     private String livingIn;      // 거주지 (예: "Seoul")
-    private String language;      // 언어 (예: "ko")
+    private List<String> languages;     // 언어 (예: "ko")
     private String introduction;  // 자기소개
 
     // 🔹 추가: 태그(코드), 지역(라벨 문자열)

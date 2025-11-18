@@ -1,6 +1,7 @@
 package kr.ac.inhatc.paldari.auth.controller;
 
 import kr.ac.inhatc.paldari.auth.dto.ProfileBasicDto;
+import kr.ac.inhatc.paldari.auth.dto.ProfileDetailDto;
 import kr.ac.inhatc.paldari.auth.dto.UpdateProfileBasicRequest;
 import kr.ac.inhatc.paldari.auth.entity.User;
 import kr.ac.inhatc.paldari.auth.repository.UserRepository;
@@ -45,6 +46,30 @@ public class UserProfileController {
 
         // buddyId = User.id 기준으로 요약 조회
         return ratingService.getSummaryForBuddy(u.getId());
+    }
+
+    // ========== Public Profile (상대 프로필 공개 조회) ==========
+
+    /**
+     * 상대 프로필 상세 조회
+     * GET /api/profile/public/{userId}
+     *
+     * - UserProfileService.getPublicProfile(userId) 로 기본 프로필 조회
+     * - RatingService.getSummaryForBuddy(userId) 로 평점 요약 조회
+     * - 둘을 합쳐서 ProfileDetailDto 로 반환
+     */
+    @GetMapping("/public/{userId}")
+    public ResponseEntity<ProfileDetailDto> getPublicProfile(@PathVariable Long userId) {
+
+        // 기본 프로필 (태그/지역 포함)
+        ProfileBasicDto profile = userProfileService.getPublicProfile(userId);
+
+        // 평점 요약
+        RatingSummaryDto ratingSummary = ratingService.getSummaryForBuddy(userId);
+
+        ProfileDetailDto dto = new ProfileDetailDto(profile, ratingSummary);
+
+        return ResponseEntity.ok(dto);
     }
 
     // ========== Settings ==========
@@ -101,6 +126,7 @@ public class UserProfileController {
         ProfileBasicDto dto = userProfileService.getBasic(uname);
         return ResponseEntity.ok(dto);
     }
+
 
     /** 내 정보 부분 수정 (DTO) */
     @PatchMapping("/basic")

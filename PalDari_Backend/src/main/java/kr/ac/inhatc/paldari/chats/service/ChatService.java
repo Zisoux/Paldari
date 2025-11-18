@@ -90,10 +90,34 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<ChatRoomResponse> getMyRooms(Long meId) {
         var rooms = chatRoomMemberRepository.findRoomsByUserId(meId);
+
         return rooms.stream()
-                .map(ChatRoomResponse::from)
+                .map(room -> {
+                    // 🔹 이 방에서 "나(meId)가 아닌" 상대 유저 찾기
+                    User partner = chatRoomMemberRepository.findPartnerUser(room.getId(), meId);
+
+                    String name;
+                    String subText;
+
+                    if (partner != null) {
+                        // 항상 상대 기준으로 이름/서브텍스트 구성
+                        name = partner.getUsername();          // 필요하면 nickname 으로 변경 가능
+                        subText = buildSubTextForRoom(partner);
+                    } else {
+                        // 혹시라도 null이면 기존 값 fallback
+                        name = room.getName();
+                        subText = room.getSubText();
+                    }
+
+                    return ChatRoomResponse.builder()
+                            .roomId(room.getId())
+                            .name(name)
+                            .subText(subText)
+                            .build();
+                })
                 .toList();
     }
+
 
     private String buildSubTextForRoom(User target) {
         String country = target.getCountry();
