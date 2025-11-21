@@ -212,7 +212,7 @@ class _PostsScreenState extends State<PostsScreen> {
       case 'english':
       case 'us':
       case 'en-us':
-      case 'en-gb':
+      case 'en-uk':
         return 'en';
 
       case '일본어':

@@ -42,7 +42,7 @@ class _SignupScreenState extends State<SignupScreen> {
     'MY': '말레이시아',
     'US': '미국',
     'CA': '캐나다',
-    'GB': '영국',
+    'UK': '영국',
     'DE': '독일',
     'FR': '프랑스',
   };

@@ -124,7 +124,7 @@ const regionsByCountry = {
   ],
 
   // 🇬🇧 United Kingdom
-  'GB': [
+  'UK': [
     'London',
     'Manchester',
     'Liverpool',

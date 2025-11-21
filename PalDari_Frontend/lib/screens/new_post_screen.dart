@@ -176,7 +176,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
         return 'ko';
       case 'english':
       case 'en-us':
-      case 'en-gb':
+      case 'en-uk':
         return 'en';
       case 'japanese':
       case 'jp':
