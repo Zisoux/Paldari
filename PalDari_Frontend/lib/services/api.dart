@@ -267,17 +267,17 @@ class ApiService {
   }
 
   // ========== MATCHING (조건 매칭 / 랜덤 매칭 / 채팅 생성) ==========
-
   /// (1) 조건에 맞는 Pal 리스트 전체
   ///
   /// GET /api/matching/candidates
   /// 쿼리 예시:
-  ///   ?nationality=일본&category=생활&region=서울&gender=여성&minAge=20&maxAge=30
+  ///   ?nationality=일본&category=생활&region=서울&language=한국어&gender=여성&minAge=20&maxAge=30
   Future<List<Map<String, dynamic>>> fetchMatchingCandidates({
     String? nationality, // BUDDY 국적
-    String? category, // 카테고리
-    String? region, // 상세 지역
-    String? gender, // "남성" / "여성" / "무관"
+    String? category,    // 카테고리
+    String? region,      // 활동 지역
+    String? language,    // 사용 언어
+    String? gender,      // "남성" / "여성" / "무관"
     int? minAge,
     int? maxAge,
   }) async {
@@ -291,6 +291,9 @@ class ApiService {
     }
     if (region != null && region.isNotEmpty) {
       query['region'] = region;
+    }
+    if (language != null && language.isNotEmpty) {
+      query['language'] = language;
     }
     if (gender != null && gender.isNotEmpty && gender != '무관') {
       query['gender'] = gender;
@@ -320,6 +323,7 @@ class ApiService {
     );
   }
 
+
   /// (1-1) 조건에 맞는 Pal 중 "가장 우선순위 높은 1명"만 가져오기
   ///
   /// 지금은 단순히 첫 번째 후보를 선택.
@@ -327,6 +331,7 @@ class ApiService {
     String? nationality,
     String? category,
     String? region,
+    String? language,
     String? gender,
     int? minAge,
     int? maxAge,
@@ -335,6 +340,7 @@ class ApiService {
       nationality: nationality,
       category: category,
       region: region,
+      language: language,
       gender: gender,
       minAge: minAge,
       maxAge: maxAge,
@@ -343,6 +349,7 @@ class ApiService {
     if (list.isEmpty) return null;
     return list.first;
   }
+
 
   /// (2) 조건 없이 랜덤 Pal 1명
   ///

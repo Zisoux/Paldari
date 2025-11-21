@@ -9,7 +9,6 @@ const kLanguages = <Map<String, String>>[
   {'label': '한국어', 'code': 'ko'},
   {'label': '영어',   'code': 'en'},
   {'label': '일본어', 'code': 'ja'},
-  {'label': '중국어', 'code': 'zh'},
   {'label': '프랑스어','code': 'fr'},
   {'label': '독일어', 'code': 'de'},
   {'label': '말레이어','code': 'ms'},

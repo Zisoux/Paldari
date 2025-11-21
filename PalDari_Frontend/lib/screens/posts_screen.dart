@@ -45,7 +45,6 @@ class _PostsScreenState extends State<PostsScreen> {
     {'label': '영어',   'code': 'en'},
     {'label': '일본어', 'code': 'ja'},
     {'label': '말레이어','code': 'ms'},
-    {'label': '중국어', 'code': 'zh'},
     {'label': '프랑스어','code': 'fr'},
     {'label': '독일어', 'code': 'de'},
   ];
@@ -196,7 +195,7 @@ class _PostsScreenState extends State<PostsScreen> {
     if (v.isEmpty) return ''; // 미지정은 빈 문자열 취급
 
     // 코드 그대로 들어온 경우
-    const codes = {'all','ko','en','ja','ms','zh','fr','de'};
+    const codes = {'all','ko','en','ja','ms','fr','de'};
     if (codes.contains(v)) return v;
 
     // 라벨/별칭 매핑
@@ -225,12 +224,6 @@ class _PostsScreenState extends State<PostsScreen> {
       case 'malay':
       case 'ms-my':
         return 'ms';
-
-      case '중국어':
-      case 'chinese':
-      case 'zh-cn':
-      case 'zh-tw':
-        return 'zh';
 
       case '프랑스어':
       case 'french':

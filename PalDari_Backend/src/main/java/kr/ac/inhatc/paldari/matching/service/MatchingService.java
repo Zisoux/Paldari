@@ -32,29 +32,39 @@ public class MatchingService {
      * 매칭 후보 리스트
      * - currentUserId: 나(Seeker)
      * - condition: 매칭 화면에서 사용자가 선택한 조건들
-     *
-     * 동작:
-     *  1) userRepository.findAllPalsForUser(currentUserId) 로 "팔 후보" 전체 조회
-     *  2) 각 후보마다 조건과 얼마나 맞는지 score 계산
-     *  3) score > 0 인 애들만 남기고, score 내림차순으로 정렬
-     *
-     * ⚠️ minAge/maxAge(나이)는 아직 User 엔티티와 연결 안 했으므로
-     *    우선 점수 계산에서 제외(TODO)해둔 상태.
      */
     public List<PalSummaryResponse> findMatchingCandidates(
             Long currentUserId,
             MatchingCondition condition
     ) {
-        // 1) 팔 후보 전체 로딩 (나 제외 + 역할 등은 쿼리에서 처리했다고 가정)
+        // 1) 팔 후보 전체 로딩 (나 제외 + allowMatching 등은 쿼리에서 처리)
         List<User> all = userRepository.findAllPalsForUser(currentUserId);
 
-        // 2) 조건 값 정리
-        String nationality = trimOrNull(condition.nationality());
-        String category    = trimOrNull(condition.category());
-        String region      = trimOrNull(condition.region());
+        // 2) 조건 값 정리 ("전체"/"무관"/"ALL"은 null 로)
+        String nationality = normalizeFilter(condition.nationality());
+        String category    = normalizeFilter(condition.category());
+        String region      = normalizeFilter(condition.region());   // 활동 지역
+        String language    = normalizeFilter(condition.language());
         String gender      = normalizeGender(condition.gender());
-        // Integer minAge     = condition.minAge();
-        // Integer maxAge     = condition.maxAge();
+        // Integer minAge  = condition.minAge();
+        // Integer maxAge  = condition.maxAge();
+
+        boolean hasAnyCondition =
+                nationality != null ||
+                        category != null ||
+                        region != null ||
+                        language != null ||
+                        gender != null;
+        // || minAge != null || maxAge != null;  // 나이 필터 연결 시 포함
+
+        // 🔹 아무 조건도 없으면 점수 계산 없이 전체 반환
+        if (!hasAnyCondition) {
+            log.info("Matching candidates for {} with no conditions -> {} users",
+                    currentUserId, all.size());
+            return all.stream()
+                    .map(PalSummaryResponse::from)
+                    .toList();
+        }
 
         // 내부용: 점수 + 유저 묶음
         class ScoredUser {
@@ -72,7 +82,6 @@ public class MatchingService {
         for (User u : all) {
             int score = 0;
 
-            // --- ① 국적 ---
             // --- ① 국적 (다중 국적: 하나라도 일치하면 +3) ---
             if (nationality != null &&
                     u.getCountries() != null &&
@@ -88,7 +97,6 @@ public class MatchingService {
                 }
             }
 
-
             // --- ② 카테고리 (Tag 로 매칭) ---
             if (category != null && u.getTags() != null && !u.getTags().isEmpty()) {
                 boolean hasCategory = u.getTags().stream()
@@ -101,7 +109,7 @@ public class MatchingService {
                 }
             }
 
-            // --- ③ 지역 (Regions 컬렉션) ---
+            // --- ③ 활동 지역 (Regions 컬렉션) ---
             if (region != null && u.getRegions() != null && !u.getRegions().isEmpty()) {
                 boolean hasRegion = u.getRegions().stream()
                         .map(r -> trimOrNull(r.getRegion()))
@@ -113,7 +121,15 @@ public class MatchingService {
                 }
             }
 
-            // --- ④ 성별 ---
+            // --- ④ 언어 ---
+            if (language != null && u.getLanguage() != null) {
+                String userLang = trimOrNull(u.getLanguage());
+                if (userLang != null && userLang.equalsIgnoreCase(language)) {
+                    score += 2;
+                }
+            }
+
+            // --- ⑤ 성별 ---
             if (gender != null && u.getGender() != null) {
                 String userGender = trimOrNull(u.getGender());
                 if (userGender != null && userGender.equalsIgnoreCase(gender)) {
@@ -121,7 +137,7 @@ public class MatchingService {
                 }
             }
 
-            // --- ⑤ 나이 범위 (TODO) ---
+            // --- ⑥ 나이 범위 (TODO) ---
 
             // 최소 하나라도 조건이 맞으면 후보로 인정
             if (score > 0) {
@@ -187,7 +203,6 @@ public class MatchingService {
                 .subText(countryText + " / " + target.getLivingIn())
                 .build();
 
-
         chatRoomRepository.save(room);
 
         // 3) 멤버 2명 저장 (나 / 상대)
@@ -243,11 +258,20 @@ public class MatchingService {
         return t.isEmpty() ? null : t;
     }
 
+    /**
+     * "전체", "무관", "ALL" 등은 필터 미적용으로 간주
+     */
+    private String normalizeFilter(String s) {
+        String v = trimOrNull(s);
+        if (v == null) return null;
+        if ("전체".equals(v) || "무관".equals(v)) return null;
+        if ("ALL".equalsIgnoreCase(v)) return null;
+        return v;
+    }
+
     private String normalizeGender(String g) {
-        String gender = trimOrNull(g);
-        if (gender == null) return null;
-        if ("무관".equals(gender)) return null; // "무관"이면 조건에서 제외
-        return gender;
+        // 필요하면 여기서 "남", "여" → "남성", "여성" 매핑도 가능
+        return normalizeFilter(g);
     }
 
     /**

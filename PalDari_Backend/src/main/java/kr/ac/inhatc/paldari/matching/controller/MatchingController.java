@@ -33,6 +33,7 @@ public class MatchingController {
             @RequestParam(required = false) String nationality,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String region,
+            @RequestParam(required = false) String language,
             @RequestParam(required = false) String gender,
             @RequestParam(required = false) Integer minAge,
             @RequestParam(required = false) Integer maxAge
@@ -43,6 +44,7 @@ public class MatchingController {
                 .nationality(nationality)
                 .category(category)
                 .region(region)
+                .language(language)
                 .gender(gender)
                 .minAge(minAge)
                 .maxAge(maxAge)
@@ -54,7 +56,6 @@ public class MatchingController {
     /**
      * 조건 기반으로 "가장 잘 맞는 1명" 찾기
      * GET /api/matching/best
-     * (프론트에서 이걸 쓰고 있다면 이런 식으로)
      */
     @GetMapping("/best")
     public PalSummaryResponse getBestMatch(
@@ -62,6 +63,7 @@ public class MatchingController {
             @RequestParam(required = false) String nationality,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String region,
+            @RequestParam(required = false) String language,
             @RequestParam(required = false) String gender,
             @RequestParam(required = false) Integer minAge,
             @RequestParam(required = false) Integer maxAge
@@ -72,6 +74,7 @@ public class MatchingController {
                 .nationality(nationality)
                 .category(category)
                 .region(region)
+                .language(language)
                 .gender(gender)
                 .minAge(minAge)
                 .maxAge(maxAge)

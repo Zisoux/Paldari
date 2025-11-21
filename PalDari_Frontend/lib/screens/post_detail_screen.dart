@@ -390,8 +390,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         return '일본어';
       case 'ms':
         return '말레이어';
-      case 'zh':
-        return '중국어';
       case 'fr':
         return '프랑스어';
       case 'de':

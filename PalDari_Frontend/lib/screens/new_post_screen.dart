@@ -71,7 +71,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
     {'label': '영어', 'code': 'en'},
     {'label': '일본어', 'code': 'ja'},
     {'label': '말레이어', 'code': 'ms'},
-    {'label': '중국어', 'code': 'zh'},
     {'label': '프랑스어', 'code': 'fr'},
     {'label': '독일어', 'code': 'de'},
   ];
@@ -163,7 +162,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
     if (v == null || v.trim().isEmpty) return null;
     final s = v.trim();
 
-    const codes = {'all', 'ko', 'en', 'ja', 'ms', 'zh', 'fr', 'de'};
+    const codes = {'all', 'ko', 'en', 'ja', 'ms', 'fr', 'de'};
     if (codes.contains(s.toLowerCase())) return s.toLowerCase();
 
     for (final e in kLanguages) {
@@ -185,10 +184,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
       case 'malay':
       case 'ms-my':
         return 'ms';
-      case 'chinese':
-      case 'zh-cn':
-      case 'zh-tw':
-        return 'zh';
       case 'french':
       case 'fr-fr':
         return 'fr';

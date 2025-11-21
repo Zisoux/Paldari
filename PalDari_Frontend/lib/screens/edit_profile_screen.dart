@@ -41,7 +41,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'ko': '한국어',
     'en': 'English',
     'ja': '日本語',
-    'zh': '中文',
     'ms': 'Bahasa Melayu',
     'fr': 'Français',
     'de': 'Deutsch',
@@ -51,7 +50,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const Map<String, String> _countryOptions = {
     'KR': '대한민국',
     'JP': '일본',
-    'CN': '중국',
+    'AU': '호주',
     'MY': '말레이시아',
     'US': '미국',
     'CA': '캐나다',

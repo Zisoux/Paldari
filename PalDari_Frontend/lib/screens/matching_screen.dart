@@ -18,6 +18,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
   bool _loading = false; // 전체 매칭 진행 중 로딩
 
   // 상세 조건 상태
+  String? _region;   // 활동 지역 (문자열로 입력)
   String? _language; // 사용 언어 (드롭다운)
   String? _gender;   // '무관' / '남성' / '여성'
 
@@ -53,16 +54,14 @@ class _MatchingScreenState extends State<MatchingScreen> {
         pal = await _api.findRandomMatch();
       } else {
         // 조건 기반 "가장 우선순위 높은 1명"
-        //
-        // 🔸 지금은 language를 backend의 region 파라미터에 얹어서 보내는 형태야.
-        //    나중에 backend가 language 필터를 받도록 바뀌면
-        //    ApiService.findBestMatch에 language 파라미터 추가해서 갈아끼우면 됨.
+        // 🔸 이제는 region = 활동 지역, language = 사용 언어로 각각 전송
         pal = await _api.findBestMatch(
           nationality: selectedNationality,
           category: selectedCategory,
-          region: _language,
+          region: _region,
+          language: _language,
           gender: _gender,
-          // minAge / maxAge 는 더 이상 사용 안 함
+          // minAge / maxAge 는 사용하지 않음
         );
       }
 
@@ -99,7 +98,9 @@ class _MatchingScreenState extends State<MatchingScreen> {
 
   /// "매칭되었어요!" 모달
   Future<void> _showMatchDialog(Map<String, dynamic> pal) async {
-    final nickname = (pal['nickname'] ?? pal['username'] ?? pal['name'] ?? '알 수 없는 Pal').toString();
+    final nickname =
+    (pal['nickname'] ?? pal['username'] ?? pal['name'] ?? '알 수 없는 Pal')
+        .toString();
     final country = (pal['country'] ?? '').toString();
     final lang = (pal['language'] ?? '').toString();
     final intro = (pal['introduction'] ?? '').toString();
@@ -108,7 +109,8 @@ class _MatchingScreenState extends State<MatchingScreen> {
     if (targetUserId == null) {
       // 백엔드 응답 형식이 바뀌어서 id가 없으면 그냥 안내만
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('매칭 정보에 사용자 ID가 없어요. 백엔드 응답을 확인해주세요.')),
+        const SnackBar(
+            content: Text('매칭 정보에 사용자 ID가 없어요. 백엔드 응답을 확인해주세요.')),
       );
       return;
     }
@@ -185,8 +187,9 @@ class _MatchingScreenState extends State<MatchingScreen> {
         return;
       }
 
-      final roomId =
-      roomIdDynamic is int ? roomIdDynamic : int.tryParse(roomIdDynamic.toString()) ?? 0;
+      final roomId = roomIdDynamic is int
+          ? roomIdDynamic
+          : int.tryParse(roomIdDynamic.toString()) ?? 0;
 
       final roomName = (room['name'] ?? fallbackName).toString();
 
@@ -276,7 +279,8 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         label: Text(n),
                         selected: selectedNationality == n,
                         selectedColor: orange.withOpacity(0.6),
-                        onSelected: (_) => setState(() => selectedNationality = n),
+                        onSelected: (_) =>
+                            setState(() => selectedNationality = n),
                       ),
                   ],
                 ),
@@ -306,7 +310,8 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         label: Text(c),
                         selected: selectedCategory == c,
                         selectedColor: orange.withOpacity(0.6),
-                        onSelected: (_) => setState(() => selectedCategory = c),
+                        onSelected: (_) =>
+                            setState(() => selectedCategory = c),
                       ),
                   ],
                 ),
@@ -324,8 +329,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
                 ),
                 const SizedBox(height: 12),
                 _AdvancedFilters(
+                  region: _region,
                   language: _language,
                   gender: _gender,
+                  onRegionChanged: (v) => setState(() => _region = v),
                   onLanguageChanged: (v) => setState(() => _language = v),
                   onGenderChanged: (v) => setState(() => _gender = v),
                 ),
@@ -341,10 +348,12 @@ class _MatchingScreenState extends State<MatchingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: Colors.black.withOpacity(0.5)),
+                        side:
+                        BorderSide(color: Colors.black.withOpacity(0.5)),
                       ),
                     ),
-                    onPressed: _loading ? null : () => _startMatching(random: false),
+                    onPressed:
+                    _loading ? null : () => _startMatching(random: false),
                     child: const Text(
                       '매칭 시작',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -356,13 +365,15 @@ class _MatchingScreenState extends State<MatchingScreen> {
                 const SizedBox(height: 24),
                 Row(
                   children: const [
-                    Expanded(child: Divider(color: Color(0xFF595959), height: 1)),
+                    Expanded(
+                        child: Divider(color: Color(0xFF595959), height: 1)),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
-                      child:
-                      Text('또는', style: TextStyle(color: Color(0xFF595959))),
+                      child: Text('또는',
+                          style: TextStyle(color: Color(0xFF595959))),
                     ),
-                    Expanded(child: Divider(color: Color(0xFF595959), height: 1)),
+                    Expanded(
+                        child: Divider(color: Color(0xFF595959), height: 1)),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -376,10 +387,12 @@ class _MatchingScreenState extends State<MatchingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: Colors.black.withOpacity(0.5)),
+                        side:
+                        BorderSide(color: Colors.black.withOpacity(0.5)),
                       ),
                     ),
-                    onPressed: _loading ? null : () => _startMatching(random: true),
+                    onPressed:
+                    _loading ? null : () => _startMatching(random: true),
                     child: const Text(
                       '조건 없이 빠른 대화 시작',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -403,17 +416,21 @@ class _MatchingScreenState extends State<MatchingScreen> {
   }
 }
 
-/// 상세 조건(선택) - 사용 언어 + 성별
+/// 상세 조건(선택) - 활동 지역 + 사용 언어 + 성별
 class _AdvancedFilters extends StatelessWidget {
+  final String? region;
   final String? language;
   final String? gender;
+  final ValueChanged<String?> onRegionChanged;
   final ValueChanged<String?> onLanguageChanged;
   final ValueChanged<String?> onGenderChanged;
 
   const _AdvancedFilters({
     super.key,
+    required this.region,
     required this.language,
     required this.gender,
+    required this.onRegionChanged,
     required this.onLanguageChanged,
     required this.onGenderChanged,
   });
@@ -421,10 +438,42 @@ class _AdvancedFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const labelStyle = TextStyle(fontWeight: FontWeight.w600);
+    // region이 null 또는 빈 문자열이면 "전체"로 간주 (선택 안 함)
+    final selectedRegion = (region ?? '').isNotEmpty ? region : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 활동 지역 (드롭다운)
+        const Text('활동 지역', style: labelStyle),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: selectedRegion,
+          items: const [
+            // 필요에 따라 네가 정의해둔 활동 지역 리스트로 교체하면 됨
+            DropdownMenuItem(value: 'Seoul', child: Text('서울')),
+            DropdownMenuItem(value: 'Busan', child: Text('부산')),
+            DropdownMenuItem(value: 'Incheon', child: Text('인천')),
+            DropdownMenuItem(value: 'Tokyo', child: Text('Tokyo')),
+            DropdownMenuItem(value: 'Osaka', child: Text('Osaka')),
+            DropdownMenuItem(value: 'Kuala Lumpur', child: Text('Kuala Lumpur')),
+            DropdownMenuItem(value: 'New York', child: Text('New York')),
+            DropdownMenuItem(value: 'Los Angeles', child: Text('Los Angeles')),
+          ],
+          onChanged: (value) {
+            // "" 또는 null이면 필터 미적용(null)로 처리
+            if (value == null || value.isEmpty) {
+              onRegionChanged(null);
+            } else {
+              onRegionChanged(value);
+            }
+          },
+          decoration: _fieldDecoration().copyWith(
+            hintText: '활동 지역 선택 (선택사항)',
+          ),
+        ),
+        const SizedBox(height: 16),
+
         // 사용 언어
         const Text('사용 언어', style: labelStyle),
         const SizedBox(height: 8),
@@ -433,7 +482,8 @@ class _AdvancedFilters extends StatelessWidget {
           items: const [
             DropdownMenuItem(value: '한국어', child: Text('한국어')),
             DropdownMenuItem(value: 'English (US)', child: Text('English (US)')),
-            DropdownMenuItem(value: 'Bahasa Melayu', child: Text('Bahasa Melayu')),
+            DropdownMenuItem(
+                value: 'Bahasa Melayu', child: Text('Bahasa Melayu')),
             DropdownMenuItem(value: '日本語', child: Text('日本語')),
             DropdownMenuItem(value: 'Deutsch', child: Text('Deutsch')),
             DropdownMenuItem(value: 'Français', child: Text('Français')),
