@@ -182,8 +182,9 @@ class AuthState with ChangeNotifier {
       String u,
       String e,
       String p, {
-        String? gender,      // ✅ 추가
-        String? birthdate,   // ✅ 추가
+        String? gender,      // ✅ 성별
+        String? birthdate,   // ✅ 생년월일
+        List<String>? countries,     // ✅ 복수로 변경
       }) async {
     loading = true;
     error = null;
@@ -195,7 +196,8 @@ class AuthState with ChangeNotifier {
         password: p,
         gender: gender,
         birthdate: birthdate,
-      );
+        countries: countries,      // ✅ 그대로 전달
+    );
     } catch (e) {
       error = e.toString();
     } finally {
@@ -538,7 +540,7 @@ class AuthState with ChangeNotifier {
     }
   }
 
-  // ===== Profile Basic (gender, birthdate, livingIn, introduction, tags, languages, regions) =====
+  // ===== Profile Basic (gender, birthdate, country, livingIn, introduction, tags, languages, regions) =====
 
   Future<Map<String, dynamic>?> fetchProfileBasic() async {
     if (!isLoggedIn) return null;
@@ -572,10 +574,11 @@ class AuthState with ChangeNotifier {
   Future<bool> updateProfileBasic({
     String? gender,
     DateTime? birthdate,
+    List<String>? countries,  // ✅ 국적 코드 리스트 (예: ["KR","MY"])
     String? livingIn,
     String? introduction,
     List<String>? tags,
-    List<String>? languages, // ✅ 구사 언어 (복수)
+    List<String>? languages,  // ✅ 구사 언어 (복수)
     List<String>? regions,
   }) async {
     if (!isLoggedIn) return false;
@@ -588,6 +591,7 @@ class AuthState with ChangeNotifier {
       final d = birthdate.day.toString().padLeft(2, '0');
       payload['birthdate'] = '$y-$m-$d';
     }
+   if (countries != null) payload['countries'] = countries; // ✅ 국적 리스트 전달
     if (livingIn != null) payload['livingIn'] = livingIn;
     if (introduction != null) payload['introduction'] = introduction;
 

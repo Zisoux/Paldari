@@ -16,8 +16,9 @@ class AuthService {
     required String username,
     required String email,
     required String password,
-    String? gender,      // ✅ 추가
-    String? birthdate,   // ✅ 추가 (yyyy-MM-dd 문자열)
+    String? gender,      // ✅ 선택
+    String? birthdate,   // ✅ 선택 (yyyy-MM-dd 문자열)
+    List<String>? countries,     // ✅ 추가: 국가 코드 (예: "KR", "MY")
   }) async {
     try {
       final body = <String, dynamic>{
@@ -31,6 +32,9 @@ class AuthService {
       }
       if (birthdate != null && birthdate.isNotEmpty) {
         body['birthdate'] = birthdate;
+      }
+      if (countries != null && countries.isNotEmpty) {
+        body['countries'] = countries;
       }
 
       final res = await _dio.post(

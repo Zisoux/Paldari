@@ -57,8 +57,9 @@ public class UserService implements UserDetailsService {
             String username,
             String email,
             String rawPassword,
-            String gender,      // ✅ 추가
-            String birthdate    // ✅ 추가 ("yyyy-MM-dd")
+            String gender,         // 선택: "MALE", "FEMALE", "OTHER" 등
+            String birthdate,      // 선택: "yyyy-MM-dd"
+            List<String> countries // 선택: 국가 코드 리스트 (예: ["KR", "MY"])
     ) {
         if (userRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("Username already exists");
@@ -76,6 +77,7 @@ public class UserService implements UserDetailsService {
                 "ROLE_USER",
                 LocalDateTime.now()
         );
+
         // ✅ 성별 세팅 (null/공백이면 무시)
         if (gender != null && !gender.trim().isEmpty()) {
             user.setGender(gender.trim());
@@ -89,6 +91,19 @@ public class UserService implements UserDetailsService {
                 throw new IllegalArgumentException("Invalid birthdate format (expected yyyy-MM-dd): " + birthdate);
             }
         }
+
+        // ✅ 국적 리스트 세팅 (null/공백 제거 후, 중복 제거)
+        if (countries != null) {
+            List<String> norm = countries.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .distinct()
+                    .toList();
+            user.getCountries().clear();
+            user.getCountries().addAll(norm);
+        }
+
         userRepository.save(user);
 
         String token = generateToken();

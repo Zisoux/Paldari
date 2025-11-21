@@ -21,7 +21,7 @@ public class ProfileDetailDto {
     // =======================
     private String gender;
     private String birthdate;
-    private String country;
+    private List<String> countries;
     private String livingIn;
     private List<String> languages;
     private String introduction;
@@ -45,7 +45,7 @@ public class ProfileDetailDto {
 
         this.gender = profile.getGender();
         this.birthdate = profile.getBirthdate();
-        this.country = profile.getCountry();
+        this.countries = profile.getCountries();
         this.livingIn = profile.getLivingIn();
         this.languages = profile.getLanguages();
 

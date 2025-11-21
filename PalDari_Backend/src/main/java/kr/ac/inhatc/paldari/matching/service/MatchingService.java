@@ -73,12 +73,21 @@ public class MatchingService {
             int score = 0;
 
             // --- ① 국적 ---
-            if (nationality != null) {
-                String userCountry = trimOrNull(u.getCountry());
-                if (userCountry != null && userCountry.equalsIgnoreCase(nationality)) {
+            // --- ① 국적 (다중 국적: 하나라도 일치하면 +3) ---
+            if (nationality != null &&
+                    u.getCountries() != null &&
+                    !u.getCountries().isEmpty()) {
+
+                boolean hasNationality = u.getCountries().stream()
+                        .map(this::trimOrNull)
+                        .filter(Objects::nonNull)
+                        .anyMatch(c -> c.equalsIgnoreCase(nationality));
+
+                if (hasNationality) {
                     score += 3; // 국적 가중치
                 }
             }
+
 
             // --- ② 카테고리 (Tag 로 매칭) ---
             if (category != null && u.getTags() != null && !u.getTags().isEmpty()) {
@@ -168,10 +177,16 @@ public class MatchingService {
         }
 
         // 2) 없으면 새 방 생성
+        // 다중 국적 전체를 ", " 로 연결하여 표시
+        String countryText = (target.getCountries() == null || target.getCountries().isEmpty())
+                ? ""
+                : String.join(", ", target.getCountries());
+
         ChatRoom room = ChatRoom.builder()
-                .name(target.getUsername())  // 혹은 me + target 조합
-                .subText(target.getCountry() + " / " + target.getLivingIn())
+                .name(target.getUsername())
+                .subText(countryText + " / " + target.getLivingIn())
                 .build();
+
 
         chatRoomRepository.save(room);
 

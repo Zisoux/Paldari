@@ -1,3 +1,4 @@
+// lib/screens/edit_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -22,7 +23,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   static const brown = Color(0xFF734124);
   static const chipBg = Color(0xFFF5E4D6);
 
-  // ===================== 태그 / 언어 옵션 =====================
+  // ===================== 태그 / 언어 / 국가 옵션 =====================
 
   /// 마이페이지에서 사용할 고정 태그 (최대 5개 선택)
   /// 코드는 서버/DB에서 사용하기 좋게 영문으로, 라벨은 한글로.
@@ -36,7 +37,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /// 구사 언어 옵션
   /// code -> label
-  /// (향후 백엔드에서도 같은 코드값을 기준으로 Enum/상수 등으로 맞춰주면 좋음)
   static const Map<String, String> _languageOptions = {
     'ko': '한국어',
     'en': 'English',
@@ -45,6 +45,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     'ms': 'Bahasa Melayu',
     'fr': 'Français',
     'de': 'Deutsch',
+  };
+
+  /// 국가 코드 옵션 (홈 화면에서 쓰는 country 코드와 동일하게)
+  static const Map<String, String> _countryOptions = {
+    'KR': '대한민국',
+    'JP': '일본',
+    'CN': '중국',
+    'MY': '말레이시아',
+    'US': '미국',
+    'CA': '캐나다',
+    'GB': '영국',
+    'DE': '독일',
+    'FR': '프랑스',
   };
 
   /// 국가별 "출신 지역" 리스트 (라벨 그대로 저장)
@@ -229,8 +242,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // ===================== 상태값 =====================
 
-  String? _gender; // 'MALE' | 'FEMALE' | 'OTHER' | null
+  String? _gender;        // 'MALE' | 'FEMALE' | 'OTHER' | null
   DateTime? _birthdate;
+  Set<String> _countryCodes = {};  // ✅ 여러 국적 코드
 
   /// 태그는 코드(LIFE/…),
   /// 구사 언어는 코드(ko/en/…) ,
@@ -268,6 +282,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           } catch (_) {}
         }
 
+        // ✅ 국적(countries): 리스트 우선, 없으면 단일 country 로 처리
+        final rawCountries = p['countries'] ?? p['country'];
+        _countryCodes =
+            _parseCodes(rawCountries, _countryOptions, maxCount: 5);
+
         // livingIn / introduction
         _livingInCtrl.text = (p['livingIn'] as String?)?.trim() ?? '';
         _introCtrl.text = (p['introduction'] as String?)?.trim() ?? '';
@@ -278,7 +297,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         // 구사 언어: ["ko","en"] / "ko,en" / ["한국어","English"] 모두 처리
         final rawLanguages = p['languages'];
-        _languages = _parseCodes(rawLanguages, _languageOptions, maxCount: 5);
+        _languages =
+            _parseCodes(rawLanguages, _languageOptions, maxCount: 5);
 
         // 지역: ["Kuala Lumpur","서울"] / "Kuala Lumpur,서울" 모두 처리
         final rawRegions = p['regions'];
@@ -296,7 +316,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // ===================== 매핑 유틸 =====================
 
-  /// 태그/언어용: 라벨 또는 코드를 받아서 "코드"로 변환
+  /// 태그/언어/국적용: 라벨 또는 코드를 받아서 "코드"로 변환
   String? _toCode(String value, Map<String, String> options) {
     if (value.isEmpty) return null;
 
@@ -311,7 +331,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return found.key.isEmpty ? null : found.key;
   }
 
-  /// 서버에서 온 값(raw)을 Set<code>로 변환 (태그/언어용 공통)
+  /// 서버에서 온 값(raw)을 Set<code>로 변환 (태그/언어/국적 공통)
   Set<String> _parseCodes(
       dynamic raw,
       Map<String, String> options, {
@@ -417,10 +437,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final ok = await context.read<AuthState>().updateProfileBasic(
       gender: _gender,
       birthdate: _birthdate,
+      countries: _countryCodes.isEmpty
+          ? null
+          : _countryCodes.toList(), // ✅ 여러 국적 리스트로 전달
       livingIn: _livingInCtrl.text.trim(),
       introduction: _introCtrl.text.trim(),
       tags: tagCodes,
-      languages: languageCodes, // ✅ 새로 추가 (AuthState에도 반영 필요)
+      languages: languageCodes,
       regions: regionLabels,
     );
 
@@ -456,7 +479,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  /// 멀티 선택 칩 영역 (태그/언어용)
+  /// 멀티 선택 칩 영역 (태그/언어/국적용)
   Widget _buildMultiChipGroup({
     required Map<String, String> options,
     required Set<String> selectedValues,
@@ -526,8 +549,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 20),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -583,7 +606,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             const SizedBox(width: 8),
                             OutlinedButton.icon(
                               onPressed: _pickBirthdate,
-                              icon: const Icon(Icons.calendar_today, size: 18),
+                              icon:
+                              const Icon(Icons.calendar_today, size: 18),
                               label: const Text('선택'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: brown,
@@ -592,10 +616,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+
+                        // ✅ 국적 (국가 코드 - 다중 선택)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              '국가 / 국적 (홈 화면 국기 표시용)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${_countryCodes.length}/5',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        _buildMultiChipGroup(
+                          options: _countryOptions,
+                          selectedValues: _countryCodes,
+                          onToggle: (code) {
+                            setState(() {
+                              if (_countryCodes.contains(code)) {
+                                _countryCodes.remove(code);
+                              } else {
+                                if (_countryCodes.length >= 5) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                      Text('국적은 최대 5개까지 선택할 수 있어요.'),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                _countryCodes.add(code);
+                              }
+                            });
+                          },
+                        ),
                         const SizedBox(height: 20),
 
                         // ========= 섹션: 태그 & 언어 & 지역 =========
-                        _buildSectionTitle(Icons.sell, '관심 태그 & 구사 언어 & 활동 지역'),
+                        _buildSectionTitle(
+                            Icons.sell, '관심 태그 & 구사 언어 & 활동 지역'),
                         const SizedBox(height: 10),
 
                         const Text(
@@ -840,7 +910,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2),
+                                strokeWidth: 2,
+                              ),
                             )
                                 : const Text(
                               '저장',
@@ -881,7 +952,8 @@ class RegionPickerBottomSheet extends StatefulWidget {
       _RegionPickerBottomSheetState();
 }
 
-class _RegionPickerBottomSheetState extends State<RegionPickerBottomSheet> {
+class _RegionPickerBottomSheetState
+    extends State<RegionPickerBottomSheet> {
   late String _selectedCountry;
   late List<String> _selectedRegions;
 
@@ -900,8 +972,9 @@ class _RegionPickerBottomSheetState extends State<RegionPickerBottomSheet> {
         if (_selectedRegions.length >= widget.maxSelection) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-              Text('지역은 최대 ${widget.maxSelection}개까지 선택할 수 있어요.'),
+              content: Text(
+                '지역은 최대 ${widget.maxSelection}개까지 선택할 수 있어요.',
+              ),
             ),
           );
           return;
@@ -930,7 +1003,8 @@ class _RegionPickerBottomSheetState extends State<RegionPickerBottomSheet> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius:
+              BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1025,7 +1099,8 @@ class _RegionPickerBottomSheetState extends State<RegionPickerBottomSheet> {
                       spacing: 8,
                       runSpacing: 8,
                       children: regions.map((r) {
-                        final selected = _selectedRegions.contains(r);
+                        final selected =
+                        _selectedRegions.contains(r);
                         return FilterChip(
                           label: Text(
                             r,

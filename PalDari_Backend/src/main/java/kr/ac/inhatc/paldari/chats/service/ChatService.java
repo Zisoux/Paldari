@@ -120,10 +120,16 @@ public class ChatService {
 
 
     private String buildSubTextForRoom(User target) {
-        String country = target.getCountry();
+        // 다중 국적을 ", "로 join
+        String countryText = (target.getCountries() == null || target.getCountries().isEmpty())
+                ? null
+                : String.join(", ", target.getCountries());
+
         String living = target.getLivingIn();
-        if (country == null && living == null) return "";
-        if (country != null && living != null) return country + " / " + living;
-        return country != null ? country : living;
+
+        if (countryText == null && living == null) return "";
+        if (countryText != null && living != null) return countryText + " / " + living;
+        return countryText != null ? countryText : living;
     }
+
 }

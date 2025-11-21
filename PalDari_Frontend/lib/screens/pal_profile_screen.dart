@@ -46,7 +46,7 @@ class PalProfileScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ===== 상단 프로필 영역 (아바타 + 이름 + 국가) =====
+                      // ===== 상단 프로필 영역 (아바타 + 이름 + 국가/거주지) =====
                       Row(
                         children: [
                           CircleAvatar(
@@ -92,12 +92,27 @@ class PalProfileScreen extends StatelessWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 4),
+                                // 국적 (countries 리스트 기반으로 변경)
                                 Text(
-                                  pal.country.isEmpty ? '국가 미설정' : pal.country,
+                                  pal.countries.isEmpty
+                                      ? '국적: 미설정'
+                                      : '국적: ${pal.countries.join(' · ')}',
                                   style: const TextStyle(
                                     color: PalColors.textSecondary,
-                                    fontSize: 14,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
+                                    fontFamily: 'Open Sans',
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                // 거주지
+                                Text(
+                                  pal.livingIn.trim().isEmpty
+                                      ? '거주지: 미설정'
+                                      : '거주지: ${pal.livingIn}',
+                                  style: const TextStyle(
+                                    color: PalColors.textSecondary,
+                                    fontSize: 13,
                                     fontFamily: 'Open Sans',
                                   ),
                                 ),
@@ -158,9 +173,9 @@ class PalProfileScreen extends StatelessWidget {
                       const SizedBox(height: 20),
                       const Divider(),
 
-                      // ===== 향후 확장 영역 (언어, 소개, 지역, 평점 등) =====
+                      // ===== 구사 언어 섹션 =====
                       const Text(
-                        '추가 정보',
+                        '구사 언어',
                         style: TextStyle(
                           color: PalColors.brown,
                           fontWeight: FontWeight.w700,
@@ -168,14 +183,71 @@ class PalProfileScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        '지금은 홈에서 받은 기본 정보만 보여주고 있어요.\n'
-                            '나중에 백엔드에서 공개 프로필 API를 만들면 '
-                            '구사 언어, 활동 지역, 자기소개, 평점 등을 여기서 함께 보여줄 수 있어요.',
+                      pal.languages.isEmpty
+                          ? const Text(
+                        '등록된 구사 언어가 없습니다.',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: Colors.black54,
                         ),
+                      )
+                          : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: pal.languages
+                            .map(
+                              (lang) => Chip(
+                            label: Text(
+                              lang,
+                              style:
+                              const TextStyle(fontSize: 12),
+                            ),
+                            backgroundColor: Colors.white,
+                            materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        )
+                            .toList(),
+                      ),
+
+                      const SizedBox(height: 20),
+                      const Divider(),
+
+                      // ===== 활동 지역 섹션 =====
+                      const Text(
+                        '활동 지역',
+                        style: TextStyle(
+                          color: PalColors.brown,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      pal.regions.isEmpty
+                          ? const Text(
+                        '등록된 활동 지역이 없습니다.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.black54,
+                        ),
+                      )
+                          : Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: pal.regions
+                            .map(
+                              (r) => Chip(
+                            label: Text(
+                              r,
+                              style:
+                              const TextStyle(fontSize: 12),
+                            ),
+                            backgroundColor: Colors.white,
+                            materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        )
+                            .toList(),
                       ),
 
                       const SizedBox(height: 24),
@@ -185,7 +257,8 @@ class PalProfileScreen extends StatelessWidget {
                         width: double.infinity,
                         height: 44,
                         child: ElevatedButton.icon(
-                          icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                          icon:
+                          const Icon(Icons.chat_bubble_outline, size: 18),
                           onPressed: () async {
                             // 🔥 Pal.id 가 백엔드의 userId / memberId 와 매핑된다고 가정
                             final api = ApiService();

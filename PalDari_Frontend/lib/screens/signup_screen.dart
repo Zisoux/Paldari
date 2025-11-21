@@ -1,3 +1,4 @@
+// lib/screens/signup_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -22,6 +23,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _pw2Focus = FocusNode();
 
   String _gender = '선택 안함';
+  String? _countryCode; // ✅ 국적 코드 (예: "KR")
   bool _obscurePw = true;
   bool _obscurePw2 = true;
 
@@ -31,6 +33,19 @@ class _SignupScreenState extends State<SignupScreen> {
   final Color _border = const Color(0xFFF29D52);    // 오렌지 보더/버튼
   final Color _title = const Color(0xFF260101);     // 타이틀 컬러
   final Color _btnFg = const Color(0xFFFFF7F1);     // 버튼 글자색(밝은톤)
+
+  /// 회원가입용 국가 코드 목록 (홈 화면에서 country와 동일 기준)
+  static const Map<String, String> _countryOptions = {
+    'KR': '대한민국',
+    'JP': '일본',
+    'CN': '중국',
+    'MY': '말레이시아',
+    'US': '미국',
+    'CA': '캐나다',
+    'GB': '영국',
+    'DE': '독일',
+    'FR': '프랑스',
+  };
 
   @override
   void dispose() {
@@ -137,13 +152,18 @@ class _SignupScreenState extends State<SignupScreen> {
     final bdText = ageCtrl.text.trim();
     final birthdate = bdText.isEmpty ? null : bdText;
 
+    // 🔹 countryCode는 _countryCode 그대로 사용 (예: "KR")
+    final countryCode = _countryCode;
+
     await context.read<AuthState>().signup(
       idCtrl.text.trim(),
       emailCtrl.text.trim(),
       pwCtrl.text.trim(),
       gender: genderCode,
       birthdate: birthdate,
+      countries: countryCode == null ? null : [countryCode], // ✅ List<String>로 전달
     );
+
 
     if (!mounted) return;
 
@@ -364,6 +384,26 @@ class _SignupScreenState extends State<SignupScreen> {
                                       ),
                                     ),
                                   ],
+                                ),
+                                SizedBox(height: 12 * scale),
+
+                                // ✅ 국적 (선택)
+                                DropdownButtonFormField<String>(
+                                  value: _countryCode,
+                                  decoration: _rectField(
+                                    '국가 / 국적 (선택, 나중에 마이페이지에서 변경 가능)',
+                                  ),
+                                  items: _countryOptions.entries
+                                      .map(
+                                        (e) => DropdownMenuItem(
+                                      value: e.key,
+                                      child: Text(e.value),
+                                    ),
+                                  )
+                                      .toList(),
+                                  onChanged: (v) {
+                                    setState(() => _countryCode = v);
+                                  },
                                 ),
                               ],
                             ),

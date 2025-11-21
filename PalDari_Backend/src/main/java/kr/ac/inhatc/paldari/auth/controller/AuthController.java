@@ -18,6 +18,7 @@ import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,8 +61,9 @@ public class AuthController {
             @NotBlank String username,
             @Email String email,
             @NotBlank String password,
-            String gender,          // 선택: "MALE", "FEMALE", "OTHER" 등
-            String birthdate        // 선택: "yyyy-MM-dd"
+            String gender,            // 선택: "MALE", "FEMALE", "OTHER" 등
+            String birthdate,         // 선택: "yyyy-MM-dd"
+            List<String> countries    // 선택: 국가 코드 리스트 (예: ["KR","MY"])
     ) {}
 
     public static record LoginRequest(
@@ -74,14 +76,16 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@Valid @RequestBody SignUpRequest req) {
 
-        // gender, birthdate까지 같이 전달
+        // gender, birthdate, country까지 같이 전달
         userService.registerLocalUser(
                 req.username(),
                 req.email(),
                 req.password(),
                 req.gender(),
-                req.birthdate()
+                req.birthdate(),
+                req.countries()
         );
+
 
         return ResponseEntity.ok(
                 Map.of("message", "Sign-up success. Please verify your email.")

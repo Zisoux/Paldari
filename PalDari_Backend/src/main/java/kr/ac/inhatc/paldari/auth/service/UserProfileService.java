@@ -30,6 +30,7 @@ public class UserProfileService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + username));
     }
 
+    /** 공백 문자열은 null 로 정규화 */
     private static String emptyToNull(String s) {
         if (s == null) return null;
         String t = s.trim();
@@ -42,7 +43,7 @@ public class UserProfileService {
     public ProfileBasicDto getBasic(String username) {
         User u = getUserOrThrow(username);
 
-        // 🔹 태그/지역도 같이 조회해서 DTO에 담는다.
+        // 🔹 태그/지역 조회
         List<String> tags = tagRepository.findByUser(u).stream()
                 .map(UserTag::getTag)
                 .collect(Collectors.toList());
@@ -61,7 +62,10 @@ public class UserProfileService {
         ProfileBasicDto dto = new ProfileBasicDto();
         dto.setGender(emptyToNull(u.getGender()));
         dto.setBirthdate(u.getBirthdate() == null ? null : u.getBirthdate().toString()); // yyyy-MM-dd
-        dto.setCountry(emptyToNull(u.getCountry()));
+
+        // ✅ 국적: 다중 국가 리스트 그대로 반환 (예: ["KR","MY"])
+        dto.setCountries(u.getCountries());
+
         dto.setLivingIn(emptyToNull(u.getLivingIn()));
         dto.setLanguages(languages); // ✅ 리스트만 사용
         dto.setIntroduction(emptyToNull(u.getIntroduction()));
@@ -89,7 +93,7 @@ public class UserProfileService {
                 .map(UserRegion::getRegion)
                 .collect(Collectors.toList());
 
-        // 🔹 공개 프로필에도 동일하게 언어 리스트 세팅
+        // 🔹 언어 리스트
         List<String> languages = null;
         String langRaw = u.getLanguage();
         if (langRaw != null && !langRaw.trim().isEmpty()) {
@@ -99,7 +103,10 @@ public class UserProfileService {
         ProfileBasicDto dto = new ProfileBasicDto();
         dto.setGender(emptyToNull(u.getGender()));
         dto.setBirthdate(u.getBirthdate() == null ? null : u.getBirthdate().toString()); // yyyy-MM-dd
-        dto.setCountry(emptyToNull(u.getCountry()));
+
+        // ✅ 공개 프로필에도 국적 리스트 포함
+        dto.setCountries(u.getCountries());
+
         dto.setLivingIn(emptyToNull(u.getLivingIn()));
         dto.setIntroduction(emptyToNull(u.getIntroduction()));
         dto.setLanguages(languages);   // ✅ 리스트만 사용
@@ -117,9 +124,13 @@ public class UserProfileService {
         User u = getUserOrThrow(username);
 
         // ----- User 엔티티 기본 필드 업데이트 -----
+
+        // 성별
         if (req.getGender() != null) {
             u.setGender(emptyToNull(req.getGender()));
         }
+
+        // 생년월일
         if (req.getBirthdate() != null) {
             String b = emptyToNull(req.getBirthdate());
             if (b == null) {
@@ -132,14 +143,27 @@ public class UserProfileService {
                 }
             }
         }
-        if (req.getCountry() != null) {
-            u.setCountry(emptyToNull(req.getCountry()));
+
+        // ✅ 국적 리스트 업데이트
+        // null  : 변경 안 함
+        // []    : 전체 삭제
+        // [..]  : 정규화 후 저장
+        if (req.getCountries() != null) {
+            List<String> normCountries = req.getCountries().stream()
+                    .filter(c -> c != null && !c.trim().isEmpty())
+                    .map(String::trim)
+                    .distinct()
+                    .collect(Collectors.toList());
+            u.getCountries().clear();
+            u.getCountries().addAll(normCountries);
         }
+
+        // 거주지
         if (req.getLivingIn() != null) {
             u.setLivingIn(emptyToNull(req.getLivingIn()));
         }
-        // ✅ 대표 언어 단일 필드 제거 (req.getLanguage()는 더 이상 사용 X)
 
+        // 자기소개
         if (req.getIntroduction() != null) {
             u.setIntroduction(emptyToNull(req.getIntroduction()));
         }
@@ -147,7 +171,7 @@ public class UserProfileService {
         // ✅ 구사 언어 리스트 업데이트
         // null  : 언어 변경 안 함
         // []    : 기존 언어 모두 삭제
-        // [..]  : 콤마로 join 해서 저장
+        // [..]  : 콤마로 join 해서 저장 ("ko,en,ja")
         if (req.getLanguages() != null) {
             if (req.getLanguages().isEmpty()) {
                 u.setLanguage(null);
@@ -236,15 +260,15 @@ public class UserProfileService {
                     return ns;
                 });
 
-        if (allowNotification != null) s.setAllowNotification(allowNotification);
-        if (allowMatching != null)     s.setAllowMatching(allowMatching);
+        if (allowNotification != null)   s.setAllowNotification(allowNotification);
+        if (allowMatching != null)       s.setAllowMatching(allowMatching);
         if (realtimeTranslation != null) s.setRealtimeTranslation(realtimeTranslation);
 
         settingsRepository.save(s);
 
         return Map.of(
                 "allowNotification", s.isAllowNotification(),
-                "allowMatching", s.isAllowMatching(),
+                "allowMatching",     s.isAllowMatching(),
                 "realtimeTranslation", s.isRealtimeTranslation()
         );
     }

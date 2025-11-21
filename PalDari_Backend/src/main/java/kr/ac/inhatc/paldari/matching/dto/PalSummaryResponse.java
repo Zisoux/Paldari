@@ -15,7 +15,10 @@ public class PalSummaryResponse {
 
     private Long id;
     private String username;
-    private String country;
+
+    // ✅ 단일 country → 다중 countries
+    private List<String> countries;
+
     private String livingIn;
     private String language;
     private String introduction;
@@ -41,10 +44,15 @@ public class PalSummaryResponse {
                 .map(UserTag::getTag)
                 .toList();
 
+        // ✅ User 엔티티의 다중 국적 필드와 연결
+        List<String> countryList = user.getCountries() == null
+                ? List.of()
+                : user.getCountries();
+
         return PalSummaryResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
-                .country(user.getCountry())
+                .countries(countryList)              // ✅ 여기 수정
                 .livingIn(user.getLivingIn())
                 .language(user.getLanguage())
                 .introduction(user.getIntroduction())

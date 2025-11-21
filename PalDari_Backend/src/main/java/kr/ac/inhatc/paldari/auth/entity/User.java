@@ -44,7 +44,13 @@ public class User {
 
     private String gender;
     private LocalDate birthdate;
-    private String country;
+
+    // ✅ 국적 다중 선택: String country → List<String> countries
+    @ElementCollection
+    @CollectionTable(name = "user_countries", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "country_code")
+    private List<String> countries = new ArrayList<>();
+
     private String livingIn;
     private String language;
     private String introduction;

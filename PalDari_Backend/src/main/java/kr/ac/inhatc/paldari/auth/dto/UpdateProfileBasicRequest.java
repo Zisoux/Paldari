@@ -22,7 +22,7 @@ public class UpdateProfileBasicRequest {
 
     private String gender;
     private String birthdate;    // "yyyy-MM-dd"
-    private String country;
+    private List<String> countries;
     private String livingIn;
 
     // ✅ 기존 단일 언어(대표 언어) 필드 – 이미 쓰고 있다면 계속 사용 가능
