@@ -17,4 +17,7 @@ public class PostResponse {
     private String language;
     private Boolean isForeigner;
     private String persona;
+
+    // ⭐ 게시판 그룹 (정보 / 소통)
+    private String group;
 }

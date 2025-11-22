@@ -141,6 +141,7 @@ class ApiService {
     String? language, // 🔹 추가
     bool? isForeigner, // 🔹 추가
     String? persona, // 🔹 추가
+    String? group,   // ⭐ 게시판 그룹 ("정보" / "소통")
   }) async {
     final body = <String, dynamic>{
       'title': title,
@@ -150,7 +151,9 @@ class ApiService {
       if (language != null && language.isNotEmpty) 'language': language,
       if (isForeigner != null) 'isForeigner': isForeigner,
       if (persona != null && persona.isNotEmpty) 'persona': persona,
+      if (group != null && group.isNotEmpty) 'group': group, // ⭐ 추가
     };
+
 
     final res = await _dio.post('/api/posts', data: body);
 
@@ -172,7 +175,9 @@ class ApiService {
     String? language,
     bool? isForeigner,
     String? persona,
+    String? group,   // ⭐ 게시판 그룹 ("정보" / "소통")
   }) async {
+
     final body = <String, dynamic>{
       'title': title,
       'content': content,
@@ -181,7 +186,9 @@ class ApiService {
       if (language != null && language.isNotEmpty) 'language': language,
       if (isForeigner != null) 'isForeigner': isForeigner,
       if (persona != null && persona.isNotEmpty) 'persona': persona,
+      if (group != null && group.isNotEmpty) 'group': group, // ⭐ 추가
     };
+
 
     final res = await _dio.put('/api/posts/$id', data: body);
 

@@ -14,12 +14,15 @@ public class PostDetailResponse {
     private String content;
     private String authorUsername;
 
-    // 🔹 메타데이터 필드 추가
+    // 🔹 메타데이터 필드
     private String country;
     private String category;
     private String language;
     private Boolean isForeigner;
     private String persona;
+
+    // ⭐ 게시판 그룹 (정보 / 소통)
+    private String group;
 
     // 🔹 첨부파일 목록
     private List<AttachmentDto> attachments;

@@ -1,4 +1,3 @@
-// lib/screens/new_post_screen.dart
 import 'dart:convert';
 // import 'dart:io'; // 사용하지 않아서 주석 처리 (원하면 그대로 둬도 됨)
 
@@ -22,6 +21,9 @@ class NewPostScreen extends StatefulWidget {
   final String? initialLanguage; // '전체' | '한국어' | '영어' ... (라벨 또는 코드)
   final String? initialPersona; // '전체' | '내국인' | '외국인'
 
+  // ⭐ 현재 게시판 그룹 (정보 / 소통) - 목록 화면에서 넘겨줌
+  final String? boardGroup;
+
   final bool isEdit; // true면 수정 모드
 
   const NewPostScreen({
@@ -32,6 +34,7 @@ class NewPostScreen extends StatefulWidget {
     this.initialCategory,
     this.initialLanguage,
     this.initialPersona,
+    this.boardGroup,        // ⭐ 추가
     this.isEdit = false,
   }) : super(key: key);
 
@@ -81,6 +84,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
   late String selectedLanguageCode; // ✅ 언어는 코드로 관리 ('all'|'ko'|...)
   late String selectedPersona;
 
+  // ⭐ 정보 / 소통
+  late String selectedGroup; // '정보' 또는 '소통'
+
+
   // ── 기존 첨부파일 상태 (수정 모드 전용) ─────────────────────────────────
   List<Map<String, dynamic>> existingAttachments = [];
 
@@ -107,6 +114,9 @@ class _NewPostScreenState extends State<NewPostScreen> {
         _langCodeFromLabelOrCode(widget.initialLanguage) ?? 'all';
     selectedPersona = widget.initialPersona ?? '전체';
 
+    // ⭐ 현재 게시판 탭(정보 / 소통) 기준 기본값
+    selectedGroup = widget.boardGroup ?? '정보';
+
     // 🔹 수정 모드면 existingPost 값으로 덮어쓰기
     if (widget.isEdit && widget.existingPost != null) {
       final p = widget.existingPost!;
@@ -115,7 +125,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
       _contentCtrl.text = (p['content'] ?? '').toString();
 
       selectedCountry = (p['country'] ?? selectedCountry).toString();
-      selectedCategory = (p['category'] ?? selectedCategory).toString();
+
+      // ⭐ 변경: DB에서 온 category 코드/라벨을 항상 "라벨"로 변환해서 드롭다운에 넣기
+      final rawCategory = (p['category'] ?? selectedCategory).toString();
+      selectedCategory = _categoryLabelFromAny(rawCategory);
 
       // language: 코드/라벨 어떤 형식이 와도 처리
       final langFromPost =
@@ -139,8 +152,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
       }
       selectedPersona = personaValue;
 
+      // ⭐ 기존 게시글의 group 반영 (정보 / 소통)
+      final rawGroup = p['group']?.toString();
+      if (rawGroup == '정보' || rawGroup == '소통') {
+        selectedGroup = rawGroup!;  // ✅ String 으로 캐스팅
+      }
+
       // 🔹 기존 첨부파일 목록 세팅 (attachments: [{id, url, originalName}, ...])
-      final rawAtt = p['attachments'];
+    final rawAtt = p['attachments'];
       if (rawAtt is List) {
         existingAttachments = rawAtt
             .map<Map<String, dynamic>>(
@@ -202,6 +221,42 @@ class _NewPostScreenState extends State<NewPostScreen> {
       orElse: () => const {'label': '전체', 'code': 'all'},
     );
     return m['label']!;
+  }
+
+  // ⭐ 추가: 카테고리 코드/라벨 → 항상 "라벨"로 만드는 헬퍼
+  String _categoryLabelFromAny(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return '전체';
+
+    // 코드인 경우
+    switch (s.toUpperCase()) {
+      case 'ALL':
+        return '전체';
+      case 'LIFE':
+        return '생활';
+      case 'STUDY':
+        return '학업';
+      case 'REGION':
+        return '지역';
+      case 'SAFETY':
+        return '안전';
+      case 'JOB':
+        return '취업';
+    }
+
+    // 이미 라벨이면 그대로
+    switch (s) {
+      case '전체':
+      case '생활':
+      case '학업':
+      case '지역':
+      case '안전':
+      case '취업':
+        return s;
+    }
+
+    // 알 수 없는 값이면 기본값
+    return '전체';
   }
 
   // ── 🔥 파일 선택: "이미지 파일만" 허용 ───────────────────────────────────
@@ -369,13 +424,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
         'title': _titleCtrl.text.trim(),
         'content': _contentCtrl.text.trim(),
         'country': selectedCountry,
-        'category': selectedCategory,
+        'category': selectedCategory, // 라벨 그대로 보내고, 서버에서 정규화
         'language':
         selectedLanguageCode == 'all' ? null : selectedLanguageCode,
         'isForeigner': selectedPersona == '외국인'
             ? true
             : (selectedPersona == '내국인' ? false : null),
         'persona': selectedPersona == '전체' ? null : selectedPersona,
+        'group': selectedGroup, // ⭐ 정보 / 소통
       }..removeWhere((k, v) => v == null);
 
       if (widget.isEdit && widget.postId != null) {
@@ -389,6 +445,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           language: payload['language'] as String?,
           isForeigner: payload['isForeigner'] as bool?,
           persona: payload['persona'] as String?,
+          group: payload['group'] as String?, // ⭐ 추가
         );
         final updatedId = (updated['id'] as num).toInt();
 
@@ -407,6 +464,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           language: payload['language'] as String?,
           isForeigner: payload['isForeigner'] as bool?,
           persona: payload['persona'] as String?,
+          group: payload['group'] as String?, // ⭐ 추가
         );
         final createdId = (created['id'] as num).toInt();
 
@@ -507,6 +565,17 @@ class _NewPostScreenState extends State<NewPostScreen> {
                             ),
                           ],
                         ),
+
+                        const SizedBox(height: 10),
+
+                        // ⭐ 게시판 유형 (정보 / 소통)
+                        _PersonaSegment(
+                          label: '게시판 유형',
+                          value: selectedGroup,
+                          options: const ['정보', '소통'],
+                          onChanged: (v) => setState(() => selectedGroup = v),
+                        ),
+
                         const SizedBox(height: 10),
                         Row(
                           children: [
@@ -523,14 +592,16 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                           horizontal: 10),
                                       decoration: BoxDecoration(
                                         color: _PostsTokens.chipBg,
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius:
+                                        BorderRadius.circular(12),
                                       ),
                                       child: DropdownButton<String>(
                                         value: selectedLanguageCode,
                                         borderRadius:
                                         BorderRadius.circular(12),
                                         icon: const Icon(Icons.expand_more,
-                                            size: 20, color: Colors.black87),
+                                            size: 20,
+                                            color: Colors.black87),
                                         items: kLanguages
                                             .map(
                                               (e) =>
@@ -539,7 +610,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                                 child: Text(
                                                   e['label']!,
                                                   style: const TextStyle(
-                                                    fontWeight: FontWeight.w600,
+                                                    fontWeight:
+                                                    FontWeight.w600,
                                                     color: Colors.black87,
                                                   ),
                                                 ),
@@ -548,8 +620,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                             .toList(),
                                         onChanged: (code) {
                                           if (code == null) return;
-                                          setState(
-                                                  () => selectedLanguageCode = code);
+                                          setState(() =>
+                                          selectedLanguageCode = code);
                                         },
                                       ),
                                     ),
@@ -650,7 +722,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                 ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius:
+                                  BorderRadius.circular(10),
                                   border: Border.all(
                                     color: const Color(0xFFEAEAEA),
                                   ),
@@ -702,14 +775,17 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                 backgroundColor: brand,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius:
+                                  BorderRadius.circular(10),
                                 ),
-                                padding: const EdgeInsets.symmetric(
+                                padding:
+                                const EdgeInsets.symmetric(
                                   horizontal: 12,
                                   vertical: 10,
                                 ),
                               ),
-                              icon: const Icon(Icons.attach_file_rounded),
+                              icon: const Icon(
+                                  Icons.attach_file_rounded),
                               label: const Text('파일 선택'),
                             ),
                             const SizedBox(width: 8),
@@ -736,17 +812,20 @@ class _NewPostScreenState extends State<NewPostScreen> {
                                 'jpeg',
                                 'gif',
                                 'webp'
-                              ].contains(f.extension?.toLowerCase());
+                              ].contains(
+                                  f.extension?.toLowerCase());
                               return Container(
                                 margin:
                                 const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.symmetric(
+                                padding:
+                                const EdgeInsets.symmetric(
                                   horizontal: 10,
                                   vertical: 10,
                                 ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius:
+                                  BorderRadius.circular(10),
                                   border: Border.all(
                                     color: const Color(0xFFEAEAEA),
                                   ),

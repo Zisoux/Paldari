@@ -1,6 +1,8 @@
 package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.transaction.Transactional;
+import kr.ac.inhatc.paldari.auth.entity.User;
+import kr.ac.inhatc.paldari.auth.repository.UserRepository;
 import kr.ac.inhatc.paldari.community.web.dto.AttachmentDto;
 import kr.ac.inhatc.paldari.community.web.dto.PostDetailResponse;
 import kr.ac.inhatc.paldari.community.web.dto.PostRequest;
@@ -22,6 +24,8 @@ import java.util.List;
 public class PostService {
 
     private final PostRepository repo;
+
+    private final UserRepository userRepository;
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<PostResponse> listAll() {
@@ -72,6 +76,7 @@ public class PostService {
                 p.getLanguage(),
                 p.getIsForeigner(),
                 p.getPersona(),
+                p.getGroup(),          // ⭐ group 추가
                 attachmentDtos
         );
     }
@@ -82,19 +87,33 @@ public class PostService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 필요");
         }
 
+        // username → User 엔티티 조회
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
+
+        // 라벨/코드 정규화
+        String normalizedCategory = normalizeCategory(req.getCategory());
+        String normalizedLanguage = normalizeLanguage(req.getLanguage());
+        String normalizedPersona  = normalizePersona(req.getPersona());
+
         // 기본 필드 생성자 사용
         Post p = new Post(
                 username,
                 req.getTitle(),
                 req.getContent(),
                 req.getCountry(),
-                req.getCategory()
+                normalizedCategory
         );
 
-        // 🔹 추가 메타데이터 매핑
-        p.setLanguage(req.getLanguage());
+        // 메타데이터 매핑
+        p.setLanguage(normalizedLanguage);
         p.setIsForeigner(req.getIsForeigner());
-        p.setPersona(req.getPersona());
+        p.setPersona(normalizedPersona);
+        p.setGroup(req.getGroup());   // ⭐ group 세팅
+
+        // author_id(FK) 채우기
+        p.setAuthor(user);
 
         Post saved = repo.save(p);
         return toDto(saved);
@@ -114,15 +133,20 @@ public class PostService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "수정 권한이 없습니다.");
         }
 
+        // 라벨/코드 정규화
+        String normalizedCategory = normalizeCategory(req.getCategory());
+        String normalizedLanguage = normalizeLanguage(req.getLanguage());
+        String normalizedPersona  = normalizePersona(req.getPersona());
+
         p.setTitle(req.getTitle());
         p.setContent(req.getContent());
         p.setCountry(req.getCountry());
-        p.setCategory(req.getCategory());
+        p.setCategory(normalizedCategory);
 
-        // 🔹 추가 메타데이터 매핑
-        p.setLanguage(req.getLanguage());
+        p.setLanguage(normalizedLanguage);
         p.setIsForeigner(req.getIsForeigner());
-        p.setPersona(req.getPersona());
+        p.setPersona(normalizedPersona);
+        p.setGroup(req.getGroup());   // ⭐ group 수정 시 반영
 
         return toDto(p);
     }
@@ -160,7 +184,58 @@ public class PostService {
                 // 🔹 확장 필드들
                 p.getLanguage(),
                 p.getIsForeigner(),
-                p.getPersona()
+                p.getPersona(),
+                p.getGroup()   // ⭐ 응답 DTO에 group 포함
         );
+    }
+
+    // ─────────── 라벨/코드 정규화 헬퍼 ───────────
+
+    private String normalizeCategory(String raw) {
+        if (raw == null) return null;
+        return switch (raw.trim()) {
+            case "전체" -> "ALL";
+            case "생활" -> "LIFE";
+            case "학업" -> "STUDY";
+            case "지역" -> "REGION";
+            case "안전" -> "SAFETY";
+            case "취업" -> "JOB";
+            default -> raw;   // 이미 코드값이면 그대로 사용
+        };
+    }
+
+    private String normalizeLanguage(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String s = raw.trim();
+
+        // 이미 코드면 그대로
+        switch (s.toLowerCase()) {
+            case "ko", "en", "ja", "ms", "fr", "de", "all" -> {
+                return s.toLowerCase();
+            }
+        }
+
+        // 라벨 → 코드
+        return switch (s) {
+            case "한국어" -> "ko";
+            case "영어" -> "en";
+            case "일본어" -> "ja";
+            case "말레이어" -> "ms";
+            case "프랑스어" -> "fr";
+            case "독일어" -> "de";
+            case "전체" -> "all";
+            default -> s;
+        };
+    }
+
+    private String normalizePersona(String raw) {
+        if (raw == null || raw.trim().isEmpty()) return null;
+        String s = raw.trim();
+        return switch (s) {
+            case "내국인" -> "LOCAL";
+            case "외국인" -> "FOREIGN";
+            case "전체" -> null;
+            default -> s;
+        };
     }
 }

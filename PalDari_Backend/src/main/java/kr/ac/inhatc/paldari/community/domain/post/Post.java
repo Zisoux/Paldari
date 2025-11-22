@@ -1,6 +1,8 @@
 package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.persistence.*;
+import kr.ac.inhatc.paldari.auth.entity.User;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,11 @@ public class Post {
     // 작성자 username (User 엔티티와 FK 안 걸고 문자열로 보관)
     @Column(name = "author_username", nullable = false, length = 50)
     private String authorUsername;
+
+    // 🔥 User 엔티티와 FK 매핑
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
 
     @Column(nullable = false, length = 150)
     private String title;
@@ -40,6 +47,11 @@ public class Post {
 
     @Column(length = 50)
     private String persona;    // "내국인" 또는 "외국인" (문자 방식)
+
+    // ⭐ 게시판 그룹: "정보" 또는 "소통"
+    @Column(name = "post_group", length = 20)
+    private String group;
+
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -108,6 +120,10 @@ public class Post {
     public String getPersona() { return persona; }
     public void setPersona(String persona) { this.persona = persona; }
 
+    public String getGroup() { return group; }
+    public void setGroup(String group) { this.group = group; }
+
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
@@ -118,6 +134,15 @@ public class Post {
     public void setAttachments(List<PostAttachment> attachments) {
         this.attachments = attachments;
     }
+
+    public User getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(User author) {
+        this.author = author;
+    }
+
 
     // 🔹 편의 메서드
     public void addAttachment(PostAttachment attachment) {

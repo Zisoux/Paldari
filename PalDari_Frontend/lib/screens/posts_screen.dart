@@ -34,18 +34,18 @@ class _PostsScreenState extends State<PostsScreen> {
   ];
   String selectedCountry = '일본'; // 시안과 동일
 
+  // 카테고리는 라벨로 관리, 코드 매핑은 헬퍼에서 처리
   final List<String> categories = const ['전체', '생활', '학업', '지역', '안전', '취업'];
   String selectedCategory = '전체';
 
   // ── ✅ 전역 고정 언어 목록(라벨/코드) + 코드 기반 선택값 ─────────────────
-  // 나라가 달라도 항상 같은 선택 폭을 보이도록 고정.
   static const List<Map<String, String>> kLanguages = [
-    {'label': '전체',   'code': 'all'},
+    {'label': '전체', 'code': 'all'},
     {'label': '한국어', 'code': 'ko'},
-    {'label': '영어',   'code': 'en'},
+    {'label': '영어', 'code': 'en'},
     {'label': '일본어', 'code': 'ja'},
-    {'label': '말레이어','code': 'ms'},
-    {'label': '프랑스어','code': 'fr'},
+    {'label': '말레이어', 'code': 'ms'},
+    {'label': '프랑스어', 'code': 'fr'},
     {'label': '독일어', 'code': 'de'},
   ];
   String selectedLanguageCode = 'all'; // 'ko'|'en'|...|'all'
@@ -81,10 +81,10 @@ class _PostsScreenState extends State<PostsScreen> {
       MaterialPageRoute(
         builder: (_) => NewPostScreen(
           initialCountry: selectedCountry,
-          initialCategory: selectedCategory,
-          // ⚠️ NewPostScreen도 코드값을 쓰도록 바꿨다면 initialLanguageCode로 전달
-          initialLanguage: _langLabelOf(selectedLanguageCode), // 호환 위해 라벨 전달
+          initialCategory: selectedCategory, // 라벨 그대로 전달 (서버에서 정규화)
+          initialLanguage: _langLabelOf(selectedLanguageCode),
           initialPersona: selectedPersona,
+          boardGroup: selectedGroup, // ⭐ 지금 선택된 탭(정보/소통) 전달
         ),
       ),
     );
@@ -121,24 +121,33 @@ class _PostsScreenState extends State<PostsScreen> {
         await api.deletePost(postId);
         await _load();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시글이 삭제되었습니다.')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('게시글이 삭제되었습니다.')));
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
       }
     }
   }
 
   // 서버에 group 필드가 없으면 기본 '정보'로 처리 + 언어/내외국인 필터 추가
   List<Map<String, dynamic>> get filteredPosts {
+    final selectedCategoryCode = _categoryCodeFromAny(selectedCategory);
+
     return posts.where((p) {
-      final postGroup    = (p['group'] ?? '정보').toString();
-      final postCountry  = (p['country'] ?? '').toString();
-      final postCategory = (p['category'] ?? '').toString();
+      final postGroup = (p['group'] ?? '정보').toString();
+      final postCountry = (p['country'] ?? '').toString();
+
+      // 카테고리: 서버는 코드(ALL/LIFE/...)를 줄 수 있고, 과거 데이터는 한글일 수 있음 → 모두 코드로 정규화
+      final rawCategory = (p['category'] ?? '').toString();
+      final postCategoryCode = _categoryCodeFromAny(rawCategory);
 
       // 언어: 다양한 키/형식 수용 → 코드로 정규화
-      final rawLang = (p['language'] ?? p['lang'] ?? p['postLang'] ?? '').toString();
-      final postLangCode = _normalizeLangCode(rawLang); // '' → '' / '한국어' → 'ko' / 'en' → 'en'
+      final rawLang =
+      (p['language'] ?? p['lang'] ?? p['postLang'] ?? '').toString();
+      final postLangCode =
+      _normalizeLangCode(rawLang); // '' → '' / '한국어' → 'ko' / 'en' → 'en'
 
       // 내/외국인: 불린/문자 모두 수용
       final bool? foreignBool = (() {
@@ -147,24 +156,38 @@ class _PostsScreenState extends State<PostsScreen> {
         if (v is num) return v != 0;
         if (v is String) {
           final s = v.toLowerCase();
-          if (['true','1','yes','y'].contains(s)) return true;
-          if (['false','0','no','n'].contains(s)) return false;
+          if (['true', '1', 'yes', 'y'].contains(s)) return true;
+          if (['false', '0', 'no', 'n'].contains(s)) return false;
         }
         return null;
       })();
 
       // 텍스트 기반 후보: persona, userType, nationalityType, memberType 등
       final String personaText = (() {
-        final raw = (p['persona'] ?? p['userType'] ?? p['nationalityType'] ?? p['memberType'] ?? '').toString().toUpperCase();
-        if (raw.contains('NATIVE') || raw.contains('KOREAN') || raw == 'KR') return '내국인';
-        if (raw.contains('FOREIGN') || raw.contains('FOREIGNER')) return '외국인';
+        final raw = (p['persona'] ??
+            p['userType'] ??
+            p['nationalityType'] ??
+            p['memberType'] ??
+            '')
+            .toString()
+            .toUpperCase();
+        if (raw.contains('NATIVE') || raw.contains('KOREAN') || raw == 'KR') {
+          return '내국인';
+        }
+        if (raw.contains('FOREIGN') || raw.contains('FOREIGNER')) {
+          return '외국인';
+        }
         return '';
       })();
 
-      // 기존 매칭
-      final groupMatch    = postGroup == selectedGroup;
-      final countryMatch  = selectedCountry.isEmpty ? true : postCountry.contains(selectedCountry);
-      final categoryMatch = (selectedCategory == '전체') ? true : postCategory.contains(selectedCategory);
+      final groupMatch = postGroup == selectedGroup;
+      final countryMatch =
+      selectedCountry.isEmpty ? true : postCountry.contains(selectedCountry);
+
+      // ✅ 카테고리 매칭: 코드 기준 ('ALL' 이면 전체)
+      final categoryMatch = (selectedCategoryCode == 'ALL')
+          ? true
+          : (postCategoryCode == selectedCategoryCode);
 
       // ✅ 언어 매칭(전역 코드 기준). 'all'이면 조건 미적용
       final languageMatch = (selectedLanguageCode == 'all')
@@ -176,7 +199,9 @@ class _PostsScreenState extends State<PostsScreen> {
           ? true
           : (() {
         if (foreignBool != null) {
-          return selectedPersona == '외국인' ? foreignBool == true : foreignBool == false;
+          return selectedPersona == '외국인'
+              ? foreignBool == true
+              : foreignBool == false;
         }
         if (personaText.isNotEmpty) {
           return selectedPersona == personaText;
@@ -185,7 +210,11 @@ class _PostsScreenState extends State<PostsScreen> {
         return true;
       })();
 
-      return groupMatch && countryMatch && categoryMatch && languageMatch && personaMatch;
+      return groupMatch &&
+          countryMatch &&
+          categoryMatch &&
+          languageMatch &&
+          personaMatch;
     }).toList();
   }
 
@@ -195,12 +224,13 @@ class _PostsScreenState extends State<PostsScreen> {
     if (v.isEmpty) return ''; // 미지정은 빈 문자열 취급
 
     // 코드 그대로 들어온 경우
-    const codes = {'all','ko','en','ja','ms','fr','de'};
+    const codes = {'all', 'ko', 'en', 'ja', 'ms', 'fr', 'de'};
     if (codes.contains(v)) return v;
 
     // 라벨/별칭 매핑
     switch (v) {
-      case '전체': return 'all';
+      case '전체':
+        return 'all';
       case '한국어':
       case 'korean':
       case 'kr':
@@ -248,6 +278,62 @@ class _PostsScreenState extends State<PostsScreen> {
     return m['label']!;
   }
 
+  // ── helpers: 카테고리 코드/라벨 매핑 ─────────────────────────────────────
+  /// 라벨 또는 코드(any)를 받아 항상 코드(ALL/LIFE/...)로 변환
+  String _categoryCodeFromAny(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return '';
+
+    // 이미 코드인 경우
+    switch (s.toUpperCase()) {
+      case 'ALL':
+      case 'LIFE':
+      case 'STUDY':
+      case 'REGION':
+      case 'SAFETY':
+      case 'JOB':
+        return s.toUpperCase();
+    }
+
+    // 라벨 → 코드
+    switch (s) {
+      case '전체':
+        return 'ALL';
+      case '생활':
+        return 'LIFE';
+      case '학업':
+        return 'STUDY';
+      case '지역':
+        return 'REGION';
+      case '안전':
+        return 'SAFETY';
+      case '취업':
+        return 'JOB';
+    }
+
+    return s; // 모르는 값은 그대로
+  }
+
+  /// 코드(ALL/LIFE/...)를 한글 라벨로 변환 (UI 표시용)
+  String _categoryLabelFromCode(String code) {
+    switch (code.toUpperCase()) {
+      case 'ALL':
+        return '전체';
+      case 'LIFE':
+        return '생활';
+      case 'STUDY':
+        return '학업';
+      case 'REGION':
+        return '지역';
+      case 'SAFETY':
+        return '안전';
+      case 'JOB':
+        return '취업';
+      default:
+        return code; // 혹시 모르는 값이면 그대로
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -281,7 +367,6 @@ class _PostsScreenState extends State<PostsScreen> {
         ],
       ),
       bottomNavigationBar: const PalBottomNav(currentIndex: 3),
-
       body: RefreshIndicator(
         onRefresh: _load,
         child: Column(
@@ -298,9 +383,7 @@ class _PostsScreenState extends State<PostsScreen> {
                       onChanged: (v) => setState(() => selectedGroup = v),
                     ),
                   ),
-
                   const SizedBox(width: 10),
-
                   // 국가 드롭다운
                   DropdownButtonHideUnderline(
                     child: Container(
@@ -312,22 +395,27 @@ class _PostsScreenState extends State<PostsScreen> {
                       child: DropdownButton<String>(
                         value: selectedCountry,
                         borderRadius: BorderRadius.circular(12),
-                        icon: const Icon(Icons.expand_more, size: 20, color: Colors.black87),
+                        icon: const Icon(Icons.expand_more,
+                            size: 20, color: Colors.black87),
                         items: countries
-                            .map((c) => DropdownMenuItem<String>(
-                          value: c,
-                          child: Text(
-                            c,
-                            style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                            .map(
+                              (c) => DropdownMenuItem<String>(
+                            value: c,
+                            child: Text(
+                              c,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87),
+                            ),
                           ),
-                        ))
+                        )
                             .toList(),
-                        onChanged: (v) => setState(() => selectedCountry = v!),
+                        onChanged: (v) =>
+                            setState(() => selectedCountry = v!),
                       ),
                     ),
                   ),
-
-                  // ✅ 언어 드롭다운(항상 같은 전역 목록 / 코드 기반)
+                  // 언어 드롭다운
                   const SizedBox(width: 8),
                   DropdownButtonHideUnderline(
                     child: Container(
@@ -337,27 +425,34 @@ class _PostsScreenState extends State<PostsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: DropdownButton<String>(
-                        value: selectedLanguageCode, // 'all'|'ko'|...
+                        value: selectedLanguageCode,
                         borderRadius: BorderRadius.circular(12),
-                        icon: const Icon(Icons.expand_more, size: 20, color: Colors.black87),
+                        icon: const Icon(Icons.expand_more,
+                            size: 20, color: Colors.black87),
                         items: kLanguages
-                            .map((e) => DropdownMenuItem<String>(
-                          value: e['code'],
-                          child: Text(
-                            e['label']!,
-                            style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                            .map(
+                              (e) => DropdownMenuItem<String>(
+                            value: e['code'],
+                            child: Text(
+                              e['label']!,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87),
+                            ),
                           ),
-                        ))
+                        )
                             .toList(),
-                        onChanged: (code) => setState(() => selectedLanguageCode = code!),
+                        onChanged: (code) =>
+                            setState(() => selectedLanguageCode = code!),
                       ),
                     ),
                   ),
-
                   // 내/외국인 세그먼트
                   const SizedBox(width: 8),
                   Container(
-                    decoration: BoxDecoration(color: chipBg, borderRadius: BorderRadius.circular(12)),
+                    decoration: BoxDecoration(
+                        color: chipBg,
+                        borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.all(2),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -368,15 +463,19 @@ class _PostsScreenState extends State<PostsScreen> {
                           borderRadius: BorderRadius.circular(10),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color: selected ? darkTab : Colors.transparent,
+                              color:
+                              selected ? darkTab : Colors.transparent,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
                               g,
                               style: TextStyle(
-                                color: selected ? Colors.white : const Color(0xFF595959),
+                                color: selected
+                                    ? Colors.white
+                                    : const Color(0xFF595959),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -403,15 +502,20 @@ class _PostsScreenState extends State<PostsScreen> {
                   return ChoiceChip(
                     label: Text(c),
                     selected: isSelected,
-                    onSelected: (_) => setState(() => selectedCategory = c),
+                    onSelected: (_) =>
+                        setState(() => selectedCategory = c),
                     selectedColor: brand,
                     backgroundColor: chipBg,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : const Color(0xFF9F9FA1),
+                      color: isSelected
+                          ? Colors.white
+                          : const Color(0xFF9F9FA1),
                       fontWeight: FontWeight.w700,
                     ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24)),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 12),
                   );
                 },
               ),
@@ -427,136 +531,257 @@ class _PostsScreenState extends State<PostsScreen> {
                   ? Center(child: Text('에러: $error'))
                   : filteredPosts.isEmpty
                   ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics:
+                const AlwaysScrollableScrollPhysics(),
                 children: const [
                   SizedBox(height: 200),
-                  Center(child: Text('게시물이 없습니다.', style: TextStyle(fontSize: 16))),
+                  Center(
+                      child: Text('게시물이 없습니다.',
+                          style: TextStyle(fontSize: 16))),
                 ],
               )
                   : ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                padding:
+                const EdgeInsets.symmetric(
+                    vertical: 8, horizontal: 12),
                 itemCount: filteredPosts.length,
                 itemBuilder: (_, i) {
                   final p = filteredPosts[i];
-                  final id = (p['id'] as num).toInt();
-                  final title = (p['title'] ?? '무제').toString();
-                  final content = (p['content'] ?? '').toString();
-                  final author = (p['authorUsername'] ?? '-').toString();
-                  final level = (p['level'] ?? 'Lv.3').toString(); // 없으면 임시
-                  final country = (p['country'] ?? '국가 미지정').toString();
-                  final createdAt = (p['createdAt'] ?? '').toString();
-                  final category = (p['category'] ?? '전체').toString();
-                  final likeCount = (p['likeCount'] ?? p['likes'] ?? 0).toString();
-                  final commentCount = (p['commentCount'] ?? p['comments'] ?? 0).toString();
+                  final id =
+                  (p['id'] as num).toInt();
+                  final title =
+                  (p['title'] ?? '무제').toString();
+                  final content =
+                  (p['content'] ?? '').toString();
+                  final author =
+                  (p['authorUsername'] ?? '-')
+                      .toString();
+                  final level =
+                  (p['level'] ?? 'Lv.3').toString();
+                  final country =
+                  (p['country'] ?? '국가 미지정')
+                      .toString();
+                  final createdAt =
+                  (p['createdAt'] ?? '')
+                      .toString();
+
+                  final rawCategory =
+                  (p['category'] ?? '전체')
+                      .toString();
+                  final postCategoryCode =
+                  _categoryCodeFromAny(
+                      rawCategory);
+                  final categoryLabel =
+                  _categoryLabelFromCode(
+                      postCategoryCode);
+
+                  final likeCount =
+                  (p['likeCount'] ??
+                      p['likes'] ??
+                      0)
+                      .toString();
+                  final commentCount =
+                  (p['commentCount'] ??
+                      p['comments'] ??
+                      0)
+                      .toString();
 
                   return GestureDetector(
                     onTap: () async {
-                      final result = await Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => PostDetailScreen(postId: id)),
+                      final result = await Navigator
+                          .of(context)
+                          .push(
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                PostDetailScreen(
+                                    postId: id)),
                       );
-                      if (result == 'deleted' || result == 'updated') {
+                      if (result == 'deleted' ||
+                          result == 'updated') {
                         await _load();
                       }
                     },
                     child: Card(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      margin: const EdgeInsets
+                          .symmetric(vertical: 6),
                       elevation: 0.5,
                       color: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius:
+                          BorderRadius.circular(
+                              12)),
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 8, 10),
+                        padding:
+                        const EdgeInsets.fromLTRB(
+                            12, 12, 8, 10),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
                           children: [
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .start,
                               children: [
                                 CircleAvatar(
                                   radius: 16,
-                                  backgroundColor: const Color(0xFFF39D52),
+                                  backgroundColor:
+                                  const Color(
+                                      0xFFF39D52),
                                   child: Text(
-                                    _initials(author),
-                                    style: const TextStyle(
-                                      color: _PostsScreenState.brandText,
-                                      fontWeight: FontWeight.w700,
+                                    _initials(
+                                        author),
+                                    style:
+                                    const TextStyle(
+                                      color: _PostsScreenState
+                                          .brandText,
+                                      fontWeight:
+                                      FontWeight
+                                          .w700,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(
+                                    width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment
+                                        .start,
                                     children: [
                                       Row(
                                         children: [
-                                          Text(author,
+                                          Text(
+                                              author,
                                               style: const TextStyle(
-                                                  fontSize: 14, fontWeight: FontWeight.w600)),
-                                          const SizedBox(width: 6),
-                                          Text(level,
+                                                  fontSize:
+                                                  14,
+                                                  fontWeight:
+                                                  FontWeight.w600)),
+                                          const SizedBox(
+                                              width:
+                                              6),
+                                          Text(
+                                              level,
                                               style: const TextStyle(
-                                                  fontSize: 12, color: Colors.grey)),
-                                          const SizedBox(width: 4),
-                                          const Icon(Icons.verified_rounded,
-                                              size: 16, color: Colors.green),
+                                                  fontSize:
+                                                  12,
+                                                  color:
+                                                  Colors.grey)),
+                                          const SizedBox(
+                                              width:
+                                              4),
+                                          const Icon(
+                                              Icons
+                                                  .verified_rounded,
+                                              size:
+                                              16,
+                                              color: Colors
+                                                  .green),
                                         ],
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox(
+                                          height: 2),
                                       Text(
                                         '$country · $createdAt',
-                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                        style: const TextStyle(
+                                            fontSize:
+                                            12,
+                                            color: Colors
+                                                .grey),
                                       ),
                                     ],
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.bookmark_border, color: Colors.black54),
-                                  onPressed: () {}, // TODO: 북마크
+                                  icon: const Icon(
+                                      Icons
+                                          .bookmark_border,
+                                      color: Colors
+                                          .black54),
+                                  onPressed:
+                                      () {}, // TODO: 북마크
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.more_horiz, color: Colors.black54),
-                                  onPressed: () {}, // TODO: 더보기 메뉴
+                                  icon: const Icon(
+                                      Icons.more_horiz,
+                                      color: Colors
+                                          .black54),
+                                  onPressed:
+                                      () {}, // TODO: 더보기 메뉴
                                 ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Text(
                               title,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight:
+                                  FontWeight
+                                      .w700),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               content,
                               maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13.5, color: Colors.black87, height: 1.4),
+                              overflow:
+                              TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 13.5,
+                                  color: Colors
+                                      .black87,
+                                  height: 1.4),
                             ),
                             const SizedBox(height: 8),
                             Wrap(
                               spacing: 6,
                               runSpacing: -6,
                               children: [
-                                _tag('#$category'),
-                                // 필요 시 여러 태그 추가 가능
+                                _tag('#$categoryLabel'),
                               ],
                             ),
                             const SizedBox(height: 8),
                             Row(
                               children: [
-                                const Icon(Icons.thumb_up_alt_outlined,
-                                    size: 14, color: Colors.grey),
+                                const Icon(
+                                    Icons
+                                        .thumb_up_alt_outlined,
+                                    size: 14,
+                                    color:
+                                    Colors.grey),
                                 const SizedBox(width: 4),
-                                Text(likeCount, style: const TextStyle(color: Colors.grey)),
-                                const SizedBox(width: 12),
-                                const Icon(Icons.chat_bubble_outline,
-                                    size: 14, color: Colors.grey),
+                                Text(likeCount,
+                                    style:
+                                    const TextStyle(
+                                        color: Colors
+                                            .grey)),
+                                const SizedBox(
+                                    width: 12),
+                                const Icon(
+                                    Icons
+                                        .chat_bubble_outline,
+                                    size: 14,
+                                    color:
+                                    Colors.grey),
                                 const SizedBox(width: 4),
-                                Text(commentCount, style: const TextStyle(color: Colors.grey)),
+                                Text(commentCount,
+                                    style:
+                                    const TextStyle(
+                                        color: Colors
+                                            .grey)),
                                 const Spacer(),
                                 IconButton(
-                                  icon: const Icon(Icons.delete_outline,
-                                      size: 18, color: Colors.redAccent),
-                                  onPressed: () => _deletePost(id),
+                                  icon: const Icon(
+                                      Icons
+                                          .delete_outline,
+                                      size: 18,
+                                      color: Colors
+                                          .redAccent),
+                                  onPressed: () =>
+                                      _deletePost(
+                                          id),
                                   tooltip: '삭제',
                                 ),
                               ],
@@ -572,7 +797,6 @@ class _PostsScreenState extends State<PostsScreen> {
           ],
         ),
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: _onCreatePressed,
         backgroundColor: brand,
@@ -587,19 +811,24 @@ class _PostsScreenState extends State<PostsScreen> {
     if (t.isEmpty) return '?';
     final parts = t.split(RegExp(r'\s+'));
     if (parts.length == 1) return parts.first.characters.first;
-    return (parts.first.characters.first + parts.last.characters.first);
+    return (parts.first.characters.first +
+        parts.last.characters.first);
   }
 
   Widget _tag(String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding:
+      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: chipBg,
         borderRadius: BorderRadius.circular(100),
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 12, color: Color(0xFF595959), fontWeight: FontWeight.w600),
+        style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF595959),
+            fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -618,7 +847,8 @@ class _GroupSegment extends StatelessWidget {
   Widget build(BuildContext context) {
     final groups = const ['정보', '소통'];
     return Container(
-      decoration: BoxDecoration(color: chipBg, borderRadius: BorderRadius.circular(12)),
+      decoration:
+      BoxDecoration(color: chipBg, borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.all(2),
       child: Row(
         children: groups.map((g) {
@@ -629,16 +859,20 @@ class _GroupSegment extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding:
+                const EdgeInsets.symmetric(vertical: 10),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: selected ? darkTab : Colors.transparent,
+                  color:
+                  selected ? darkTab : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   g,
                   style: TextStyle(
-                    color: selected ? Colors.white : const Color(0xFF595959),
+                    color: selected
+                        ? Colors.white
+                        : const Color(0xFF595959),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
