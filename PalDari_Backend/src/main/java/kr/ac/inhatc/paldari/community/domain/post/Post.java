@@ -31,27 +31,24 @@ public class Post {
     @Column(nullable = false)
     private String content;
 
-    // 선택: 커뮤니티 필터용 메타데이터
     @Column(length = 50)
     private String country;
 
     @Column(length = 50)
     private String category;
 
-    // 🔹 추가된 필드
     @Column(length = 50)
-    private String language;   // 예: 한국어, 영어, 일본어 등
+    private String language;
 
     @Column(name = "is_foreigner")
-    private Boolean isForeigner; // true=외국인, false=내국인
+    private Boolean isForeigner;
 
     @Column(length = 50)
-    private String persona;    // "내국인" 또는 "외국인" (문자 방식)
+    private String persona;
 
-    // ⭐ 게시판 그룹: "정보" 또는 "소통"
+    // ⭐ DB 컬럼명 post_group 에 맞춤
     @Column(name = "post_group", length = 20)
     private String group;
-
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -59,7 +56,6 @@ public class Post {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // 🔹 첨부파일 컬렉션 (1 : N)
     @OneToMany(
             mappedBy = "post",
             cascade = CascadeType.ALL,
@@ -93,7 +89,8 @@ public class Post {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // ─────────────────────── Getters / Setters ───────────────────────
+    // Getters / Setters
+
     public Long getId() { return id; }
 
     public String getAuthorUsername() { return authorUsername; }
@@ -123,7 +120,6 @@ public class Post {
     public String getGroup() { return group; }
     public void setGroup(String group) { this.group = group; }
 
-
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 
@@ -143,8 +139,6 @@ public class Post {
         this.author = author;
     }
 
-
-    // 🔹 편의 메서드
     public void addAttachment(PostAttachment attachment) {
         attachments.add(attachment);
         attachment.setPost(this);

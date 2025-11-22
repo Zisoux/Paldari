@@ -21,4 +21,3 @@ public class UserTag {
     @Column(nullable = false, length = 50)
     private String tag;   // "#생활", "#학업" 이런 거
 }
-

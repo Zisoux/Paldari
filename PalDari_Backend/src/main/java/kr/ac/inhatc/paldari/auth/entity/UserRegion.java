@@ -21,4 +21,3 @@ public class UserRegion {
     @Column(nullable = false, length = 100)
     private String region;   // "#서울", "#말레이시아", "#쿠알라룸푸르"
 }
-

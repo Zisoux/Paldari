@@ -51,7 +51,9 @@ public class User {
     @Column(name = "country_code")
     private List<String> countries = new ArrayList<>();
 
+    @Column(name = "living_in")
     private String livingIn;
+
     private String language;
     private String introduction;
 
@@ -59,6 +61,7 @@ public class User {
     private String role = "ROLE_USER";
 
     @CreatedDate
+    @Column(name = "created")
     private LocalDateTime created;
 
     // 🔹 Refresh Token 컬럼 추가
