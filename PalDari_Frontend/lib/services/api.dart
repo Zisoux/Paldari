@@ -273,6 +273,15 @@ class ApiService {
     }
   }
 
+  // ========== ACCOUNT (회원탈퇴) ==========
+  Future<void> deleteAccount() async {
+    final res = await _dio.delete('/api/profile');
+    if (res.statusCode != 204 && res.statusCode != 200) {
+      throw Exception('Failed to delete account: ${res.statusCode}');
+    }
+  }
+
+
   // ========== MATCHING (조건 매칭 / 랜덤 매칭 / 채팅 생성) ==========
   /// (1) 조건에 맞는 Pal 리스트 전체
   ///

@@ -3,6 +3,8 @@ package kr.ac.inhatc.paldari.rating.domain;
 import jakarta.persistence.*;
 import kr.ac.inhatc.paldari.auth.entity.User;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -23,6 +25,7 @@ public class Rating {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rater_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User rater;
 
     /**
@@ -30,7 +33,9 @@ public class Rating {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "buddy_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User buddy;
+
 
     /**
      * 어떤 채팅방/매칭에 대한 평가인지 구분하기 위한 id

@@ -434,28 +434,16 @@ class AuthState with ChangeNotifier {
 
   Future<bool> withdrawAccount() async {
     try {
-      final token = _accessToken;
-      if (token == null || token.isEmpty) {
-        error = '로그인 정보가 없습니다.';
+      // 1) 백엔드 회원탈퇴 API 호출
+      final res = await _api.dio.delete('/api/profile');
+
+      if (res.statusCode == 204 || res.statusCode == 200) {
+        // 2) 로컬 토큰/상태 삭제
+        await _clearAuthSilently();
         notifyListeners();
-        return false;
-      }
-
-      final res = await http.delete(
-        Uri.parse('$apiBase/api/auth/withdraw'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (res.statusCode == 200) {
-        await logout();
         return true;
       } else {
-        try {
-          final body = jsonDecode(res.body);
-          error = (body['message'] ?? '회원탈퇴 실패').toString();
-        } catch (_) {
-          error = '회원탈퇴 실패: ${res.body}';
-        }
+        error = '회원탈퇴 실패: ${res.statusMessage}';
         notifyListeners();
         return false;
       }

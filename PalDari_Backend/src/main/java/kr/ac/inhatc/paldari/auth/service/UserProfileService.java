@@ -336,4 +336,17 @@ public class UserProfileService {
         }
         return getRegions(username);
     }
+    @Transactional
+    public void deleteAccount(String username) {
+        User user = getUserOrThrow(username);
+
+        // 유저가 가진 태그/지역/세팅 모두 삭제
+        tagRepository.deleteAll(tagRepository.findByUser(user));
+        regionRepository.deleteAll(regionRepository.findByUser(user));
+        settingsRepository.findByUser(user).ifPresent(settingsRepository::delete);
+
+        // 마지막으로 유저 삭제
+        userRepository.delete(user);
+    }
+
 }

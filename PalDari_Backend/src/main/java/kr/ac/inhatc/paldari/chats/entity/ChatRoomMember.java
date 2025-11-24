@@ -3,6 +3,8 @@ package kr.ac.inhatc.paldari.chats.entity;
 import jakarta.persistence.*;
 import kr.ac.inhatc.paldari.auth.entity.User;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -25,7 +27,9 @@ public class ChatRoomMember {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
+
 
     private LocalDateTime joinedAt;
 

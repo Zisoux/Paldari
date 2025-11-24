@@ -229,4 +229,13 @@ public class UserProfileController {
         if (s.isEmpty()) return null;
         return s.equals("true") || s.equals("1") || s.equals("y") || s.equals("yes");
     }
+
+    // ========== Account Delete (회원 탈퇴) ==========
+    @DeleteMapping("")
+    public ResponseEntity<Void> deleteAccount(Principal principal) {
+        String uname = username(principal);
+        userProfileService.deleteAccount(uname);
+        return ResponseEntity.noContent().build();
+    }
+
 }

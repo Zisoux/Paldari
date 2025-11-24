@@ -2,6 +2,8 @@ package kr.ac.inhatc.paldari.community.domain.post;
 
 import jakarta.persistence.*;
 import kr.ac.inhatc.paldari.auth.entity.User;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -22,7 +24,9 @@ public class Post {
     // 🔥 User 엔티티와 FK 매핑
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User author;
+
 
     @Column(nullable = false, length = 150)
     private String title;
