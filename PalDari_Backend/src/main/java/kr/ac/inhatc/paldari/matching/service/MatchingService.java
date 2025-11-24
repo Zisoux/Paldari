@@ -28,6 +28,7 @@ public class MatchingService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
 
+
     /**
      * 매칭 후보 리스트
      * - currentUserId: 나(Seeker)
@@ -41,13 +42,12 @@ public class MatchingService {
         List<User> all = userRepository.findAllPalsForUser(currentUserId);
 
         // 2) 조건 값 정리 ("전체"/"무관"/"ALL"은 null 로)
-        String nationality = normalizeFilter(condition.nationality());
+// 👉 국적/언어/성별은 각각 전용 normalizer 사용
+        String nationality = normalizeNationality(condition.nationality());
         String category    = normalizeFilter(condition.category());
         String region      = normalizeFilter(condition.region());   // 활동 지역
-        String language    = normalizeFilter(condition.language());
+        String language    = normalizeLanguage(condition.language());
         String gender      = normalizeGender(condition.gender());
-        // Integer minAge  = condition.minAge();
-        // Integer maxAge  = condition.maxAge();
 
         boolean hasAnyCondition =
                 nationality != null ||
@@ -89,6 +89,8 @@ public class MatchingService {
 
                 boolean hasNationality = u.getCountries().stream()
                         .map(this::trimOrNull)
+                        // DB에 저장된 country 값도 코드/라벨 통일
+                        .map(this::normalizeNationality)
                         .filter(Objects::nonNull)
                         .anyMatch(c -> c.equalsIgnoreCase(nationality));
 
@@ -96,6 +98,7 @@ public class MatchingService {
                     score += 3; // 국적 가중치
                 }
             }
+
 
             // --- ② 카테고리 (Tag 로 매칭) ---
             if (category != null && u.getTags() != null && !u.getTags().isEmpty()) {
@@ -123,11 +126,13 @@ public class MatchingService {
 
             // --- ④ 언어 ---
             if (language != null && u.getLanguage() != null) {
-                String userLang = trimOrNull(u.getLanguage());
+                // DB 값도 정규화 (ko / en / ja ... 코드 기준)
+                String userLang = normalizeLanguage(u.getLanguage());
                 if (userLang != null && userLang.equalsIgnoreCase(language)) {
                     score += 2;
                 }
             }
+
 
             // --- ⑤ 성별 ---
             if (gender != null && u.getGender() != null) {
@@ -255,9 +260,17 @@ public class MatchingService {
     private String trimOrNull(String s) {
         if (s == null) return null;
         String t = s.trim();
+        // "#서울", "#생활" 같이 앞에 # 붙어있으면 제거
+        if (t.startsWith("#")) {
+            t = t.substring(1).trim();
+        }
         return t.isEmpty() ? null : t;
     }
 
+
+    /**
+     * "전체", "무관", "ALL" 등은 필터 미적용으로 간주
+     */
     /**
      * "전체", "무관", "ALL" 등은 필터 미적용으로 간주
      */
@@ -269,10 +282,110 @@ public class MatchingService {
         return v;
     }
 
-    private String normalizeGender(String g) {
-        // 필요하면 여기서 "남", "여" → "남성", "여성" 매핑도 가능
-        return normalizeFilter(g);
+    /**
+     * 국적 정규화
+     * - Flutter 쪽에서 "한국", "대한민국" 같이 라벨을 보내도,
+     * - DB에는 "KR" 코드가 있어도 서로 맞출 수 있게 통일
+     */
+    private String normalizeNationality(String s) {
+        String v = normalizeFilter(s);
+        if (v == null) return null;
+
+        String upper = v.toUpperCase();
+
+        return switch (upper) {
+            // 한국
+            case "KR", "KOREA", "SOUTH KOREA" -> "KR";
+            case "대한민국", "한국" -> "KR";
+
+            // 일본
+            case "JP", "JAPAN" -> "JP";
+            case "일본" -> "JP";
+
+            // 중국
+            case "CN", "CHINA" -> "CN";
+            case "중국" -> "CN";
+
+            // 말레이시아
+            case "MY", "MALAYSIA" -> "MY";
+            case "말레이시아" -> "MY";
+
+            // 미국
+            case "US", "USA", "UNITED STATES" -> "US";
+            case "미국" -> "US";
+
+            // 캐나다
+            case "CA", "CANADA" -> "CA";
+            case "캐나다" -> "CA";
+
+            // 영국
+            case "GB", "UK", "UNITED KINGDOM", "GREAT BRITAIN" -> "GB";
+            case "영국" -> "GB";
+
+            // 독일
+            case "DE", "GERMANY" -> "DE";
+            case "독일" -> "DE";
+
+            // 프랑스
+            case "FR", "FRANCE" -> "FR";
+            case "프랑스" -> "FR";
+
+            default -> v; // 모르는 값은 그대로 비교
+        };
     }
+
+    /**
+     * 언어 정규화
+     * - "한국어"/"Korean"/"ko" → "ko"
+     * - "영어"/"English"/"en" → "en"
+     */
+    private String normalizeLanguage(String s) {
+        String v = normalizeFilter(s);
+        if (v == null) return null;
+
+        String lower = v.toLowerCase();
+
+        return switch (lower) {
+            case "ko", "korean", "한국어" -> "ko";
+            case "en", "english", "영어" -> "en";
+            case "ja", "japanese", "일본어" -> "ja";
+            case "zh", "chinese", "중국어" -> "zh";
+            default -> v;
+        };
+    }
+
+    /**
+     * 성별 정규화
+     * - "무관", "전체" → null (필터 X)
+     * - "남", "남성", "male", "M" → "남성"
+     * - "여", "여성", "female", "F" → "여성"
+     *   (DB에 "남성"/"여성" 기준으로 저장됐다고 가정)
+     */
+    private String normalizeGender(String g) {
+        String v = trimOrNull(g);
+        if (v == null) return null;
+
+        // 무관 / 전체는 필터 적용 안 함
+        if ("전체".equals(v) || "무관".equals(v) || "ALL".equalsIgnoreCase(v)) {
+            return null;
+        }
+
+        String lower = v.toLowerCase();
+
+        if (lower.equals("남") || lower.equals("남성") ||
+                lower.equals("male") || lower.equals("m")) {
+            return "남성";
+        }
+
+        if (lower.equals("여") || lower.equals("여성") ||
+                lower.equals("female") || lower.equals("f")) {
+            return "여성";
+        }
+
+        // 그 외 값은 있는 그대로 사용 (예: 이미 "남성"/"여성" 인 경우)
+        return v;
+    }
+
 
     /**
      * id 로 먼저 찾고, 없으면 "숫자 username" 으로 한 번 더 찾는 헬퍼
