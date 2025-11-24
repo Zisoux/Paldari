@@ -5,6 +5,9 @@ import kr.ac.inhatc.paldari.auth.dto.ProfileBasicDto;
 import kr.ac.inhatc.paldari.auth.dto.UpdateProfileBasicRequest;
 import kr.ac.inhatc.paldari.auth.entity.*;
 import kr.ac.inhatc.paldari.auth.repository.*;
+import kr.ac.inhatc.paldari.chats.entity.ChatRoom;
+import kr.ac.inhatc.paldari.chats.repository.ChatRoomMemberRepository;
+import kr.ac.inhatc.paldari.chats.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +26,9 @@ public class UserProfileService {
     private final UserSettingsRepository settingsRepository;
     private final UserTagRepository tagRepository;
     private final UserRegionRepository regionRepository;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
+
 
     // ====================== 공통 ======================
     private User getUserOrThrow(String username) {
@@ -340,13 +346,20 @@ public class UserProfileService {
     public void deleteAccount(String username) {
         User user = getUserOrThrow(username);
 
-        // 유저가 가진 태그/지역/세팅 모두 삭제
+        // 1) 유저가 속한 채팅방 먼저 삭제 (멤버/메시지 자동 Cascade)
+        List<ChatRoom> myRooms = chatRoomRepository.findByMembersUser(user);
+        for (ChatRoom room : myRooms) {
+            chatRoomRepository.delete(room);
+        }
+
+        // 2) 태그/지역/세팅 삭제
         tagRepository.deleteAll(tagRepository.findByUser(user));
         regionRepository.deleteAll(regionRepository.findByUser(user));
         settingsRepository.findByUser(user).ifPresent(settingsRepository::delete);
 
-        // 마지막으로 유저 삭제
+        // 3) 마지막으로 유저 삭제
         userRepository.delete(user);
     }
+
 
 }
