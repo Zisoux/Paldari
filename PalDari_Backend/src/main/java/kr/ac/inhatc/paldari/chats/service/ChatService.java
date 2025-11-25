@@ -44,7 +44,8 @@ public class ChatService {
         if (existing.isPresent()) {
             ChatRoom room = existing.get();
             log.info("[ChatService] existing private room reused. roomId={}", room.getId());
-            return ChatRoomResponse.from(room);
+            // ⭐ 현재 사용자(meId) 기준 buddyUserId 세팅
+            return ChatRoomResponse.from(room, meId);
         }
 
         // 2) 유저 조회
@@ -81,7 +82,7 @@ public class ChatService {
                 room.getId(), myMember.getId(), targetMember.getId());
 
         // 5) 프론트로 넘길 DTO
-        return ChatRoomResponse.from(room);
+        return ChatRoomResponse.from(room, meId);
     }
 
     /**
@@ -98,11 +99,13 @@ public class ChatService {
 
                     String name;
                     String subText;
+                    Long buddyId = null;
 
                     if (partner != null) {
                         // 항상 상대 기준으로 이름/서브텍스트 구성
                         name = partner.getUsername();          // 필요하면 nickname 으로 변경 가능
                         subText = buildSubTextForRoom(partner);
+                        buddyId = partner.getId();
                     } else {
                         // 혹시라도 null이면 기존 값 fallback
                         name = room.getName();
@@ -112,6 +115,7 @@ public class ChatService {
                     return ChatRoomResponse.builder()
                             .roomId(room.getId())
                             .name(name)
+                            .buddyUserId(buddyId)   // ⭐ 리스트 응답에도 buddyUserId 포함
                             .subText(subText)
                             .build();
                 })

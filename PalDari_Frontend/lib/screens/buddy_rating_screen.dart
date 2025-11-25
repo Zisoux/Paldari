@@ -3,11 +3,17 @@ import '../services/api.dart';
 import '../widgets/star_rating.dart';
 
 class BuddyRatingScreen extends StatefulWidget {
+  /// ⭐ 평가받는 사람의 userId (users.id)
+  ///   → 절대 memberId / roomMemberId 아님
   final int buddyId;
+
+  /// 이 평점을 남기는 채팅방 id
   final int chatRoomId;
+
   final String buddyName;
   final String buddyImageUrl;
   final List<String> tags;
+
 
   const BuddyRatingScreen({
     Key? key,
@@ -42,6 +48,9 @@ class _BuddyRatingScreenState extends State<BuddyRatingScreen> {
       );
       return;
     }
+    // ⭐ 추가: 지금 넘기려는 buddyId / chatRoomId 확인
+    debugPrint('[RATING] buddyId=${widget.buddyId}, chatRoomId=${widget.chatRoomId}');
+
 
     setState(() => _submitting = true);
 

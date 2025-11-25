@@ -737,13 +737,15 @@ class Pal {
     final livingIn = (json['livingIn'] ?? '').toString();
 
     List<String> languages = [];
-    final rawLang = json['languages'];
+    // ⭐ 백엔드에서 "languages" (리스트) 또는 "language" (문자열) 어느 쪽이 와도 처리
+    final rawLang = json['languages'] ?? json['language'];
     if (rawLang is List) {
       languages = rawLang.map((e) => e.toString()).toList();
     } else if (rawLang is String && rawLang.isNotEmpty) {
       languages =
           rawLang.split(',').map((e) => e.trim()).toList();
     }
+
 
     return Pal(
       id: idDynamic is int

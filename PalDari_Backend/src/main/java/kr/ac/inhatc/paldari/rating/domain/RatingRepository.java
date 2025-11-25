@@ -26,6 +26,18 @@ public interface RatingRepository extends JpaRepository<Rating, Long> {
             """)
     List<ScoreCount> countByScore(@Param("buddyId") Long buddyId);
 
+    /**
+     * 회원 탈퇴 시 사용:
+     * - 해당 유저가 'buddy(평가받은 사람)'로 받은 모든 평점 삭제
+     */
+    void deleteByBuddyId(Long buddyId);
+
+    /**
+     * 회원 탈퇴 시 사용:
+     * - 해당 유저가 'rater(평가한 사람)'로 남긴 모든 평점 삭제
+     */
+    void deleteByRaterId(Long raterId);
+
     interface ScoreCount {
         int getScore();
         long getCnt();

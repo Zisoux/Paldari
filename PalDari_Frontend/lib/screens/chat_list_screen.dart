@@ -15,21 +15,36 @@ class ChatRoomSummary {
   final String subText;
   final int unreadCount;
 
+  /// ⭐ 이 채팅방에서 대화하는 상대방의 userId (users.id)
+  final int buddyUserId;
+
   ChatRoomSummary({
     required this.roomId,
     required this.name,
     required this.subText,
     required this.unreadCount,
+    required this.buddyUserId,
   });
 
   factory ChatRoomSummary.fromJson(Map<String, dynamic> json) {
-    // 백엔드 ChatRoomResponse: { id, name }
+    // 백엔드 ChatRoomResponse: { roomId, name, buddyUserId, ... }
     final id = json['roomId'] ?? json['id'];
+
+    // ⭐ 상대 유저의 userId 매핑
+    //   기본: buddyUserId
+    //   백업: buddyId / targetUserId (백엔드 필드명이 다를 경우 대비)
+    final buddyRaw =
+        json['buddyUserId'] ?? json['buddyId'] ?? json['targetUserId'];
+    final buddyUserId = buddyRaw is int
+        ? buddyRaw
+        : int.tryParse(buddyRaw?.toString() ?? '') ?? 0;
+
     return ChatRoomSummary(
       roomId: id is int ? id : int.tryParse(id.toString()) ?? 0,
       name: json['name'] ?? 'Unknown',
-      subText: json['subText'] ?? '',       // 필요 없으면 빈 문자열
-      unreadCount: json['unreadCount'] ?? 0, // 추후 서버에서 지원하면 매핑
+      subText: json['subText'] ?? '',
+      unreadCount: json['unreadCount'] ?? 0,
+      buddyUserId: buddyUserId,
     );
   }
 }
@@ -174,6 +189,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           MaterialPageRoute(
             builder: (_) => ChatRoomScreen(
               roomId: room.roomId,
+              buddyUserId: room.buddyUserId, // ⭐ 상대 userId 전달
               roomName: room.name,
             ),
           ),

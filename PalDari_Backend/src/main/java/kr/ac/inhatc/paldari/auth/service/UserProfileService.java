@@ -8,6 +8,7 @@ import kr.ac.inhatc.paldari.auth.repository.*;
 import kr.ac.inhatc.paldari.chats.entity.ChatRoom;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomMemberRepository;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomRepository;
+import kr.ac.inhatc.paldari.rating.domain.RatingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ public class UserProfileService {
     private final UserRegionRepository regionRepository;
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
+    private final RatingRepository ratingRepository;   // ⭐ 추가
 
 
     // ====================== 공통 ======================
@@ -352,14 +354,19 @@ public class UserProfileService {
             chatRoomRepository.delete(room);
         }
 
-        // 2) 태그/지역/세팅 삭제
+        // 2) 평점 삭제 (이 유저가 buddy / rater 인 모든 기록)
+        ratingRepository.deleteByBuddyId(user.getId());
+        ratingRepository.deleteByRaterId(user.getId());
+
+        // 3) 태그/지역/세팅 삭제
         tagRepository.deleteAll(tagRepository.findByUser(user));
         regionRepository.deleteAll(regionRepository.findByUser(user));
         settingsRepository.findByUser(user).ifPresent(settingsRepository::delete);
 
-        // 3) 마지막으로 유저 삭제
+        // 4) 마지막으로 유저 삭제
         userRepository.delete(user);
     }
+
 
 
 }
