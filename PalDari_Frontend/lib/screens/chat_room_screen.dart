@@ -131,10 +131,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ..addAll(history);
         });
 
-        // 🔹 번역 토글이 켜져 있으면 기존 메시지도 번역 시도
+// 🔹 번역 토글이 켜져 있으면 기존 메시지도 번역 시도
         if (_translateEnabled) {
           _translateExistingMessages();
         }
+
+// ⭐ NEW: 과거 메시지를 불러왔다면 → 읽음 처리 API 호출
+        _markAsRead();
+
       } else {
         debugPrint('loadHistory failed: ${res.statusCode} ${res.body}');
       }
@@ -142,6 +146,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       debugPrint('loadHistory error: $e');
     }
   }
+  Future<void> _markAsRead() async {
+    try {
+      final auth = context.read<AuthState>();
+      final token = auth.accessToken;
+
+      await http.patch(
+        Uri.parse('$apiBase/api/chat/rooms/${widget.roomId}/read'),
+        headers: {
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+    } catch (e) {
+      debugPrint('markAsRead error: $e');
+    }
+  }
+
 
   // 이미 로드된 메시지들을 번역
   Future<void> _translateExistingMessages() async {

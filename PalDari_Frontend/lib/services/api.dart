@@ -665,5 +665,16 @@ class ApiService {
       );
     }
   }
+  /// 채팅방 읽음 처리
+  Future<void> markChatRoomAsRead(int roomId) async {
+    final res = await _dio.patch('/api/chat/rooms/$roomId/read');
+
+    if (res.statusCode != 200 && res.statusCode != 204) {
+      throw Exception(
+        'Failed to mark chat as read: ${res.statusCode} ${res.statusMessage}',
+      );
+    }
+  }
+
 
 }

@@ -3,9 +3,11 @@ package kr.ac.inhatc.paldari.chats.service;
 import kr.ac.inhatc.paldari.auth.entity.User;
 import kr.ac.inhatc.paldari.auth.repository.UserRepository;
 import kr.ac.inhatc.paldari.chats.dto.ChatRoomResponse;
+import kr.ac.inhatc.paldari.chats.entity.ChatMessage;
 import kr.ac.inhatc.paldari.chats.entity.ChatRoom;
 import kr.ac.inhatc.paldari.chats.entity.ChatRoomMember;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomMemberRepository;
+import kr.ac.inhatc.paldari.chats.repository.ChatMessageRepository;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,8 @@ public class ChatService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final UserRepository userRepository;
+    // ⭐ 추가: 메시지 관련 쿼리용
+    private final ChatMessageRepository chatMessageRepository;
 
     /**
      * 매칭에서 "채팅 시작" 눌렀을 때:
@@ -84,17 +88,42 @@ public class ChatService {
         // 5) 프론트로 넘길 DTO
         return ChatRoomResponse.from(room, meId);
     }
+    // ChatService.java
+
+    @Transactional
+    public void markRoomAsRead(Long meId, Long roomId) {
+        // 1) 내 멤버 레코드 찾기
+        ChatRoomMember myMember = chatRoomMemberRepository
+                .findByRoomIdAndUserId(roomId, meId)
+                .orElseThrow(() -> new IllegalArgumentException("이 방의 멤버가 아닙니다."));
+
+        // 2) 이 방의 마지막 메시지 ID 조회
+        Long lastMessageId = chatMessageRepository.findLastMessageIdByRoomId(roomId);
+        if (lastMessageId == null) {
+            return; // 메시지가 하나도 없으면 그냥 종료
+        }
+
+        // 3) 마지막으로 읽은 메시지 ID 갱신
+        myMember.setLastReadMessageId(lastMessageId);
+        // 👉 @Transactional + JPA dirty checking 으로 자동 저장됨
+    }
+
 
     /**
      * 내가 속한 모든 채팅방 목록
      */
     @Transactional(readOnly = true)
     public List<ChatRoomResponse> getMyRooms(Long meId) {
+
+        // ⭐ 추가: "나" 유저 조회해서 username 가져오기
+        User me = userRepository.findById(meId)
+                .orElseThrow(() -> new IllegalArgumentException("나를 찾을 수 없습니다. id=" + meId));
+
         var rooms = chatRoomMemberRepository.findRoomsByUserId(meId);
 
         return rooms.stream()
                 .map(room -> {
-                    // 🔹 이 방에서 "나(meId)가 아닌" 상대 유저 찾기
+
                     User partner = chatRoomMemberRepository.findPartnerUser(room.getId(), meId);
 
                     String name;
@@ -102,25 +131,50 @@ public class ChatService {
                     Long buddyId = null;
 
                     if (partner != null) {
-                        // 항상 상대 기준으로 이름/서브텍스트 구성
-                        name = partner.getUsername();          // 필요하면 nickname 으로 변경 가능
+                        name = partner.getUsername();
                         subText = buildSubTextForRoom(partner);
                         buddyId = partner.getId();
                     } else {
-                        // 혹시라도 null이면 기존 값 fallback
                         name = room.getName();
                         subText = room.getSubText();
                     }
 
+                    // ⭐ 나 자신의 멤버 정보
+                    ChatRoomMember myMember =
+                            chatRoomMemberRepository.findByRoomIdAndUserId(room.getId(), meId)
+                                    .orElseThrow(() -> new IllegalStateException("멤버가 아님"));
+
+                    Long lastReadId = (myMember.getLastReadMessageId() == null)
+                            ? 0L
+                            : myMember.getLastReadMessageId();
+
+                    Long lastMessageId =
+                            chatMessageRepository.findLastMessageIdByRoomId(room.getId());
+
+
+                    int unread = 0;
+                    if (lastMessageId != null) {
+                        unread = (int) chatMessageRepository.countUnreadForUser(
+                                room.getId(),
+                                lastReadId,
+                                me.getUsername(),               // 내가 보낸 건 제외하기 위해
+                                ChatMessage.MessageType.TALK    // ⭐ enum 상수 전달
+                        );
+                    }
+
+
+
                     return ChatRoomResponse.builder()
                             .roomId(room.getId())
                             .name(name)
-                            .buddyUserId(buddyId)   // ⭐ 리스트 응답에도 buddyUserId 포함
+                            .buddyUserId(buddyId)
                             .subText(subText)
+                            .unreadCount(unread)
                             .build();
                 })
                 .toList();
     }
+
 
 
     private String buildSubTextForRoom(User target) {

@@ -30,6 +30,10 @@ public class ChatRoomMember {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
 
+    // ⭐ 추가: 이 유저가 이 방에서 마지막으로 읽은 메시지 ID
+    @Column(name = "last_read_message_id")
+    private Long lastReadMessageId;
+
 
     private LocalDateTime joinedAt;
 

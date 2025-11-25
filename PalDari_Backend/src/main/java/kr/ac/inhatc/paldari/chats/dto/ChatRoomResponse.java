@@ -10,7 +10,8 @@ public record ChatRoomResponse(
         Long roomId,
         String name,
         Long buddyUserId,
-        String subText
+        String subText,
+        Integer unreadCount
 ) {
 
     /**
@@ -32,6 +33,7 @@ public record ChatRoomResponse(
                 .name(room.getName())
                 .buddyUserId(buddyId)      // ⭐ 여기서 반드시 세팅
                 .subText(room.getSubText())
+                .unreadCount(0)
                 .build();
     }
 }

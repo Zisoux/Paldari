@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
-
 public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, Long> {
 
     // 두 유저 사이의 1:1 채팅방이 이미 있는지 찾고 싶으면
@@ -44,5 +43,17 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
     User findPartnerUser(
             @Param("roomId") Long roomId,
             @Param("meId") Long meId
+    );
+
+    // ⭐⭐ 추가: 특정 방(roomId) + 특정 유저(userId)에 해당하는 멤버 한 명 찾기
+    @Query("""
+        select m
+        from ChatRoomMember m
+        where m.room.id = :roomId
+          and m.user.id = :userId
+        """)
+    Optional<ChatRoomMember> findByRoomIdAndUserId(
+            @Param("roomId") Long roomId,
+            @Param("userId") Long userId
     );
 }
