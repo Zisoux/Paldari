@@ -42,9 +42,9 @@ public class MatchingService {
         List<User> all = userRepository.findAllPalsForUser(currentUserId);
 
         // 2) 조건 값 정리 ("전체"/"무관"/"ALL"은 null 로)
-// 👉 국적/언어/성별은 각각 전용 normalizer 사용
+// 👉 국적/언어/성별/카테고리는 전용 normalizer 사용
         String nationality = normalizeNationality(condition.nationality());
-        String category    = normalizeFilter(condition.category());
+        String category    = normalizeCategory(condition.category());
         String region      = normalizeFilter(condition.region());   // 활동 지역
         String language    = normalizeLanguage(condition.language());
         String gender      = normalizeGender(condition.gender());
@@ -81,73 +81,102 @@ public class MatchingService {
 
         for (User u : all) {
             int score = 0;
+            boolean matched = true; // ⭐ 선택된 모든 조건을 만족해야 true
 
             // --- ① 국적 (다중 국적: 하나라도 일치하면 +3) ---
-            if (nationality != null &&
-                    u.getCountries() != null &&
-                    !u.getCountries().isEmpty()) {
-
-                boolean hasNationality = u.getCountries().stream()
+            if (nationality != null) {
+                boolean hasNationality = u.getCountries() != null
+                        && !u.getCountries().isEmpty()
+                        && u.getCountries().stream()
                         .map(this::trimOrNull)
                         // DB에 저장된 country 값도 코드/라벨 통일
                         .map(this::normalizeNationality)
                         .filter(Objects::nonNull)
                         .anyMatch(c -> c.equalsIgnoreCase(nationality));
 
-                if (hasNationality) {
+                if (!hasNationality) {
+                    matched = false;
+                } else {
                     score += 3; // 국적 가중치
                 }
             }
 
+            if (!matched) continue;
 
             // --- ② 카테고리 (Tag 로 매칭) ---
-            if (category != null && u.getTags() != null && !u.getTags().isEmpty()) {
-                boolean hasCategory = u.getTags().stream()
+            if (category != null) {
+                boolean hasCategory = u.getTags() != null
+                        && !u.getTags().isEmpty()
+                        && u.getTags().stream()
                         .map(t -> trimOrNull(t.getTag()))
+                        // DB에 저장된 코드(LIFE/…/JOB)를 기준으로 통일
+                        .map(this::normalizeCategory)
                         .filter(Objects::nonNull)
                         .anyMatch(tag -> tag.equalsIgnoreCase(category));
 
-                if (hasCategory) {
+                if (!hasCategory) {
+                    matched = false;
+                } else {
                     score += 2;
                 }
             }
 
+
+            if (!matched) continue;
+
             // --- ③ 활동 지역 (Regions 컬렉션) ---
-            if (region != null && u.getRegions() != null && !u.getRegions().isEmpty()) {
-                boolean hasRegion = u.getRegions().stream()
+            if (region != null) {
+                boolean hasRegion = u.getRegions() != null
+                        && !u.getRegions().isEmpty()
+                        && u.getRegions().stream()
                         .map(r -> trimOrNull(r.getRegion()))
                         .filter(Objects::nonNull)
                         .anyMatch(r -> r.equalsIgnoreCase(region));
 
-                if (hasRegion) {
+                if (!hasRegion) {
+                    matched = false;
+                } else {
                     score += 2;
                 }
             }
+
+            if (!matched) continue;
 
             // --- ④ 언어 ---
-            if (language != null && u.getLanguage() != null) {
+            if (language != null) {
                 // DB 값도 정규화 (ko / en / ja ... 코드 기준)
-                String userLang = normalizeLanguage(u.getLanguage());
-                if (userLang != null && userLang.equalsIgnoreCase(language)) {
+                String userLang = (u.getLanguage() != null)
+                        ? normalizeLanguage(u.getLanguage())
+                        : null;
+
+                if (userLang == null || !userLang.equalsIgnoreCase(language)) {
+                    matched = false;
+                } else {
                     score += 2;
                 }
             }
 
+            if (!matched) continue;
 
             // --- ⑤ 성별 ---
-            if (gender != null && u.getGender() != null) {
-                String userGender = trimOrNull(u.getGender());
-                if (userGender != null && userGender.equalsIgnoreCase(gender)) {
+            if (gender != null) {
+                // DB 값(u.getGender())도 코드로 정규화해서 비교
+                String userGender = normalizeGender(u.getGender());
+                if (userGender == null || !userGender.equalsIgnoreCase(gender)) {
+                    matched = false;
+                } else {
                     score += 1;
                 }
             }
 
-            // --- ⑥ 나이 범위 (TODO) ---
 
-            // 최소 하나라도 조건이 맞으면 후보로 인정
-            if (score > 0) {
-                scored.add(new ScoredUser(u, score));
-            }
+            if (!matched) continue;
+
+            // --- ⑥ 나이 범위 (TODO) ---
+            // ※ 아직 구현 X. 기존 주석만 유지.
+
+            // ⭐ 여기까지 살아남은 유저만 후보로 인정
+            scored.add(new ScoredUser(u, score));
         }
 
         // 3) 점수 내림차순 정렬
@@ -271,9 +300,6 @@ public class MatchingService {
     /**
      * "전체", "무관", "ALL" 등은 필터 미적용으로 간주
      */
-    /**
-     * "전체", "무관", "ALL" 등은 필터 미적용으로 간주
-     */
     private String normalizeFilter(String s) {
         String v = trimOrNull(s);
         if (v == null) return null;
@@ -281,6 +307,28 @@ public class MatchingService {
         if ("ALL".equalsIgnoreCase(v)) return null;
         return v;
     }
+
+    /**
+     * 카테고리 정규화
+     * - Flutter: "생활", "학업", "지역", "안전", "취업"
+     * - DB: "LIFE", "STUDY", "REGION", "SAFETY", "JOB"
+     */
+    private String normalizeCategory(String s) {
+        String v = normalizeFilter(s);
+        if (v == null) return null;
+
+        String upper = v.toUpperCase();
+
+        return switch (upper) {
+            case "LIFE", "생활"   -> "LIFE";
+            case "STUDY", "학업"  -> "STUDY";
+            case "REGION", "지역" -> "REGION";
+            case "JOB", "취업"    -> "JOB";
+            case "SAFETY", "안전" -> "SAFETY";
+            default -> v; // 모르는 값은 그대로
+        };
+    }
+
 
     /**
      * 국적 정규화
@@ -357,9 +405,10 @@ public class MatchingService {
     /**
      * 성별 정규화
      * - "무관", "전체" → null (필터 X)
-     * - "남", "남성", "male", "M" → "남성"
-     * - "여", "여성", "female", "F" → "여성"
-     *   (DB에 "남성"/"여성" 기준으로 저장됐다고 가정)
+     * - "남", "남성", "male", "M", "MALE"  → "MALE"
+     * - "여", "여성", "female", "F", "FEMALE" → "FEMALE"
+     * - "OTHER", "기타" → "OTHER"
+     *   (DB에는 "MALE"/"FEMALE"/"OTHER" 코드로 저장된다고 가정)
      */
     private String normalizeGender(String g) {
         String v = trimOrNull(g);
@@ -372,19 +421,32 @@ public class MatchingService {
 
         String lower = v.toLowerCase();
 
+        // 남성 계열
         if (lower.equals("남") || lower.equals("남성") ||
                 lower.equals("male") || lower.equals("m")) {
-            return "남성";
+            return "MALE";
         }
 
+        // 여성 계열
         if (lower.equals("여") || lower.equals("여성") ||
                 lower.equals("female") || lower.equals("f")) {
-            return "여성";
+            return "FEMALE";
         }
 
-        // 그 외 값은 있는 그대로 사용 (예: 이미 "남성"/"여성" 인 경우)
+        // 기타
+        if (lower.equals("other") || lower.equals("기타")) {
+            return "OTHER";
+        }
+
+        // 이미 코드로 저장된 경우
+        if ("MALE".equalsIgnoreCase(v)) return "MALE";
+        if ("FEMALE".equalsIgnoreCase(v)) return "FEMALE";
+        if ("OTHER".equalsIgnoreCase(v)) return "OTHER";
+
+        // 그 외는 그대로
         return v;
     }
+
 
 
     /**
