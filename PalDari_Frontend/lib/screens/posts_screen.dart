@@ -83,11 +83,11 @@ class _PostsScreenState extends State<PostsScreen> {
           initialCountry: selectedCountry,
           initialCategory: selectedCategory, // 라벨 그대로 전달 (서버에서 정규화)
           initialLanguage: _langLabelOf(selectedLanguageCode),
-          initialPersona: selectedPersona,
           boardGroup: selectedGroup, // ⭐ 지금 선택된 탭(정보/소통) 전달
         ),
       ),
     );
+
 
     if (created != null) {
       final result = await Navigator.of(context).push(

@@ -260,7 +260,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           initialCountry: post!['country']?.toString(),
           initialCategory: post!['category']?.toString(),
           initialLanguage: post!['language']?.toString(),
-          initialPersona: post!['persona']?.toString(),
         ),
       ),
     );

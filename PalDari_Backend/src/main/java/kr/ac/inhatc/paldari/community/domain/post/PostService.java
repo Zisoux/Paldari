@@ -24,13 +24,41 @@ import java.util.List;
 public class PostService {
 
     private final PostRepository repo;
-
     private final UserRepository userRepository;
 
+    /**
+     * 🔹 기존 전체 조회 (필터 없이)
+     *   - 다른 곳에서 사용 중일 수 있어 그대로 둠
+     */
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<PostResponse> listAll() {
         return repo.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
                 .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    /**
+     * 🔹 내국인/외국인 필터를 적용한 목록 조회
+     *   persona:
+     *     - null, "전체", "ALL"  → 전체
+     *     - "LOCAL" / "내국인"  → 내국인만
+     *     - "FOREIGN" / "외국인" → 외국인만
+     */
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public List<PostResponse> listAll(String persona) {
+        String code = normalizePersona(persona); // "내국인"/"외국인"/"전체"/null 처리
+
+        List<Post> posts;
+        if (code == null) {
+            // 전체 조회
+            posts = repo.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+        } else {
+            // persona 코드(LOCAL / FOREIGN)로 필터
+            posts = repo.findByPersonaOrderByCreatedAtDesc(code);
+        }
+
+        return posts.stream()
                 .map(this::toDto)
                 .toList();
     }
@@ -41,7 +69,7 @@ public class PostService {
                 .map(this::toDto);
     }
 
-    // 🔹 기존 기본 조회 (필요하면 계속 사용)
+    // 🔹 기본 조회 (필요하면 계속 사용)
     @Transactional(Transactional.TxType.SUPPORTS)
     public PostResponse get(Long id) {
         var p = repo.findById(id)
@@ -95,7 +123,7 @@ public class PostService {
         // 라벨/코드 정규화
         String normalizedCategory = normalizeCategory(req.getCategory());
         String normalizedLanguage = normalizeLanguage(req.getLanguage());
-        String normalizedPersona  = normalizePersona(req.getPersona());
+        // 🔸 persona 는 이제 요청값을 그대로 쓰지 않고, 아래에서 자동 계산
 
         // 기본 필드 생성자 사용
         Post p = new Post(
@@ -108,12 +136,13 @@ public class PostService {
 
         // 메타데이터 매핑
         p.setLanguage(normalizedLanguage);
-        p.setIsForeigner(req.getIsForeigner());
-        p.setPersona(normalizedPersona);
         p.setGroup(req.getGroup());   // ⭐ group 세팅
 
         // author_id(FK) 채우기
         p.setAuthor(user);
+
+        // ⭐ 작성자 국적(여러 개) vs 게시글 국가를 비교해서 내/외국인 자동 계산
+        applyForeignerPersona(p, user);
 
         Post saved = repo.save(p);
         return toDto(saved);
@@ -136,7 +165,7 @@ public class PostService {
         // 라벨/코드 정규화
         String normalizedCategory = normalizeCategory(req.getCategory());
         String normalizedLanguage = normalizeLanguage(req.getLanguage());
-        String normalizedPersona  = normalizePersona(req.getPersona());
+        // 🔸 persona 는 여기서도 요청값을 사용하지 않고 자동 계산
 
         p.setTitle(req.getTitle());
         p.setContent(req.getContent());
@@ -144,9 +173,10 @@ public class PostService {
         p.setCategory(normalizedCategory);
 
         p.setLanguage(normalizedLanguage);
-        p.setIsForeigner(req.getIsForeigner());
-        p.setPersona(normalizedPersona);
         p.setGroup(req.getGroup());   // ⭐ group 수정 시 반영
+
+        // ⭐ author는 이미 p.getAuthor() 에 있으므로 그걸 기준으로 다시 계산
+        applyForeignerPersona(p, p.getAuthor());
 
         return toDto(p);
     }
@@ -189,6 +219,44 @@ public class PostService {
         );
     }
 
+    // ─────────── 내/외국인 & 페르소나 자동 계산 헬퍼 ───────────
+
+    /**
+     * 작성자(author)의 다중 국적(countries)과 게시글 country 를 비교해서
+     *  - isForeigner: true / false
+     *  - persona: "LOCAL" / "FOREIGN"
+     * 으로 자동 세팅한다.
+     *
+     * - author.countries 중 하나라도 post.country 와 같으면 → 내국인(LOCAL)
+     * - 전부 다르면 → 외국인(FOREIGN)
+     * - 둘 중 하나라도 비어 있으면 (국가 정보를 모르면) null 로 둔다.
+     */
+    private void applyForeignerPersona(Post post, User author) {
+        if (author == null) {
+            post.setIsForeigner(null);
+            post.setPersona(null);
+            return;
+        }
+
+        List<String> userCountries = author.getCountries();  // ✅ User.countries 사용
+        String postCountry = post.getCountry();
+
+        if (postCountry == null || postCountry.isBlank()
+                || userCountries == null || userCountries.isEmpty()) {
+            post.setIsForeigner(null);
+            post.setPersona(null);
+            return;
+        }
+
+        // ⚠️ user.countries 와 post.country 가 같은 포맷이라는 전제 (예: 둘 다 "KR" 같은 코드)
+        boolean isLocal = userCountries.stream()
+                .filter(c -> c != null && !c.isBlank())
+                .anyMatch(c -> c.equalsIgnoreCase(postCountry));
+
+        post.setIsForeigner(!isLocal);
+        post.setPersona(isLocal ? "LOCAL" : "FOREIGN");
+    }
+
     // ─────────── 라벨/코드 정규화 헬퍼 ───────────
 
     private String normalizeCategory(String raw) {
@@ -228,13 +296,20 @@ public class PostService {
         };
     }
 
+    /**
+     * 쿼리 파라미터/라벨에서 들어오는 persona 를 코드로 통일
+     * - "내국인" / "LOCAL"  -> "LOCAL"
+     * - "외국인" / "FOREIGN" -> "FOREIGN"
+     * - "전체" / "ALL" / null -> null (필터 안 함)
+     */
     private String normalizePersona(String raw) {
         if (raw == null || raw.trim().isEmpty()) return null;
         String s = raw.trim();
+
         return switch (s) {
-            case "내국인" -> "LOCAL";
-            case "외국인" -> "FOREIGN";
-            case "전체" -> null;
+            case "내국인", "LOCAL" -> "LOCAL";
+            case "외국인", "FOREIGN" -> "FOREIGN";
+            case "전체", "ALL" -> null;
             default -> s;
         };
     }

@@ -132,15 +132,13 @@ class ApiService {
     );
   }
 
-  /// 게시글 생성 (국가/카테고리/언어/내외국인/페르소나 포함)
+  /// 게시글 생성 (국가/카테고리/언어/게시판 그룹만 전송)
   Future<Map<String, dynamic>> createPost({
     required String title,
     required String content,
     String? country,
     String? category,
-    String? language, // 🔹 추가
-    bool? isForeigner, // 🔹 추가
-    String? persona, // 🔹 추가
+    String? language,
     String? group,   // ⭐ 게시판 그룹 ("정보" / "소통")
   }) async {
     final body = <String, dynamic>{
@@ -149,11 +147,8 @@ class ApiService {
       if (country != null && country.isNotEmpty) 'country': country,
       if (category != null && category.isNotEmpty) 'category': category,
       if (language != null && language.isNotEmpty) 'language': language,
-      if (isForeigner != null) 'isForeigner': isForeigner,
-      if (persona != null && persona.isNotEmpty) 'persona': persona,
-      if (group != null && group.isNotEmpty) 'group': group, // ⭐ 추가
+      if (group != null && group.isNotEmpty) 'group': group,
     };
-
 
     final res = await _dio.post('/api/posts', data: body);
 
@@ -165,7 +160,8 @@ class ApiService {
     );
   }
 
-  /// 게시글 수정 (제목/내용/국가/카테고리/언어/내외국인/페르소나)
+
+  /// 게시글 수정 (제목/내용/국가/카테고리/언어/게시판 그룹)
   Future<Map<String, dynamic>> updatePost({
     required int id,
     required String title,
@@ -173,8 +169,6 @@ class ApiService {
     String? country,
     String? category,
     String? language,
-    bool? isForeigner,
-    String? persona,
     String? group,   // ⭐ 게시판 그룹 ("정보" / "소통")
   }) async {
 
@@ -184,11 +178,8 @@ class ApiService {
       if (country != null && country.isNotEmpty) 'country': country,
       if (category != null && category.isNotEmpty) 'category': category,
       if (language != null && language.isNotEmpty) 'language': language,
-      if (isForeigner != null) 'isForeigner': isForeigner,
-      if (persona != null && persona.isNotEmpty) 'persona': persona,
-      if (group != null && group.isNotEmpty) 'group': group, // ⭐ 추가
+      if (group != null && group.isNotEmpty) 'group': group,
     };
-
 
     final res = await _dio.put('/api/posts/$id', data: body);
 
@@ -199,6 +190,7 @@ class ApiService {
       'Failed to update post: ${res.statusCode} ${res.statusMessage}',
     );
   }
+
 
   Future<void> deletePost(int id) async {
     final res = await _dio.delete('/api/posts/$id');

@@ -19,7 +19,6 @@ class NewPostScreen extends StatefulWidget {
   final String? initialCountry;
   final String? initialCategory;
   final String? initialLanguage; // '전체' | '한국어' | '영어' ... (라벨 또는 코드)
-  final String? initialPersona; // '전체' | '내국인' | '외국인'
 
   // ⭐ 현재 게시판 그룹 (정보 / 소통) - 목록 화면에서 넘겨줌
   final String? boardGroup;
@@ -33,8 +32,7 @@ class NewPostScreen extends StatefulWidget {
     this.initialCountry,
     this.initialCategory,
     this.initialLanguage,
-    this.initialPersona,
-    this.boardGroup,        // ⭐ 추가
+    this.boardGroup,
     this.isEdit = false,
   }) : super(key: key);
 
@@ -63,9 +61,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
     '프랑스',
   ];
 
-  // ── 카테고리, 내/외국인 ─────────────────────────────────────────────────
+  // ── 카테고리 ───────────────────────────────────────────────────────────
   final List<String> categories = const ['전체', '생활', '학업', '지역', '안전', '취업'];
-  final List<String> personas = const ['전체', '내국인', '외국인'];
 
   // ── ✅ 전역 고정 언어 목록(라벨/코드) ───────────────────────────────────
   static const List<Map<String, String>> kLanguages = [
@@ -82,11 +79,10 @@ class _NewPostScreenState extends State<NewPostScreen> {
   late String selectedCountry;
   late String selectedCategory;
   late String selectedLanguageCode; // ✅ 언어는 코드로 관리 ('all'|'ko'|...)
-  late String selectedPersona;
+  // 👇 내/외국인 선택 상태는 제거 (서버에서 자동 계산)
 
   // ⭐ 정보 / 소통
   late String selectedGroup; // '정보' 또는 '소통'
-
 
   // ── 기존 첨부파일 상태 (수정 모드 전용) ─────────────────────────────────
   List<Map<String, dynamic>> existingAttachments = [];
@@ -112,7 +108,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
     selectedCategory = widget.initialCategory ?? '전체';
     selectedLanguageCode =
         _langCodeFromLabelOrCode(widget.initialLanguage) ?? 'all';
-    selectedPersona = widget.initialPersona ?? '전체';
 
     // ⭐ 현재 게시판 탭(정보 / 소통) 기준 기본값
     selectedGroup = widget.boardGroup ?? '정보';
@@ -126,7 +121,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
 
       selectedCountry = (p['country'] ?? selectedCountry).toString();
 
-      // ⭐ 변경: DB에서 온 category 코드/라벨을 항상 "라벨"로 변환해서 드롭다운에 넣기
+      // ⭐ DB에서 온 category 코드/라벨을 항상 "라벨"로 변환해서 드롭다운에 넣기
       final rawCategory = (p['category'] ?? selectedCategory).toString();
       selectedCategory = _categoryLabelFromAny(rawCategory);
 
@@ -137,29 +132,14 @@ class _NewPostScreenState extends State<NewPostScreen> {
         selectedLanguageCode = langFromPost;
       }
 
-      // persona / isForeigner → 내국인/외국인/전체
-      final personaFromPost = p['persona']?.toString();
-      final isForeigner = p['isForeigner'] as bool?;
-      String personaValue;
-      if (personaFromPost == '내국인' || personaFromPost == '외국인') {
-        personaValue = personaFromPost!;
-      } else if (isForeigner == true) {
-        personaValue = '외국인';
-      } else if (isForeigner == false) {
-        personaValue = '내국인';
-      } else {
-        personaValue = selectedPersona;
-      }
-      selectedPersona = personaValue;
-
       // ⭐ 기존 게시글의 group 반영 (정보 / 소통)
       final rawGroup = p['group']?.toString();
       if (rawGroup == '정보' || rawGroup == '소통') {
-        selectedGroup = rawGroup!;  // ✅ String 으로 캐스팅
+        selectedGroup = rawGroup!;
       }
 
       // 🔹 기존 첨부파일 목록 세팅 (attachments: [{id, url, originalName}, ...])
-    final rawAtt = p['attachments'];
+      final rawAtt = p['attachments'];
       if (rawAtt is List) {
         existingAttachments = rawAtt
             .map<Map<String, dynamic>>(
@@ -427,10 +407,6 @@ class _NewPostScreenState extends State<NewPostScreen> {
         'category': selectedCategory, // 라벨 그대로 보내고, 서버에서 정규화
         'language':
         selectedLanguageCode == 'all' ? null : selectedLanguageCode,
-        'isForeigner': selectedPersona == '외국인'
-            ? true
-            : (selectedPersona == '내국인' ? false : null),
-        'persona': selectedPersona == '전체' ? null : selectedPersona,
         'group': selectedGroup, // ⭐ 정보 / 소통
       }..removeWhere((k, v) => v == null);
 
@@ -443,9 +419,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           country: payload['country'] as String?,
           category: payload['category'] as String?,
           language: payload['language'] as String?,
-          isForeigner: payload['isForeigner'] as bool?,
-          persona: payload['persona'] as String?,
-          group: payload['group'] as String?, // ⭐ 추가
+          group: payload['group'] as String?,
         );
         final updatedId = (updated['id'] as num).toInt();
 
@@ -462,9 +436,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           country: payload['country'] as String?,
           category: payload['category'] as String?,
           language: payload['language'] as String?,
-          isForeigner: payload['isForeigner'] as bool?,
-          persona: payload['persona'] as String?,
-          group: payload['group'] as String?, // ⭐ 추가
+          group: payload['group'] as String?,
         );
         final createdId = (created['id'] as num).toInt();
 
@@ -577,66 +549,47 @@ class _NewPostScreenState extends State<NewPostScreen> {
                         ),
 
                         const SizedBox(height: 10),
-                        Row(
+
+                        // 언어 선택 (내/외국인 UI 제거 후 단독)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 언어 선택
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const _FieldLabel('언어'),
-                                  const SizedBox(height: 6),
-                                  DropdownButtonHideUnderline(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10),
-                                      decoration: BoxDecoration(
-                                        color: _PostsTokens.chipBg,
-                                        borderRadius:
-                                        BorderRadius.circular(12),
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value: selectedLanguageCode,
-                                        borderRadius:
-                                        BorderRadius.circular(12),
-                                        icon: const Icon(Icons.expand_more,
-                                            size: 20,
-                                            color: Colors.black87),
-                                        items: kLanguages
-                                            .map(
-                                              (e) =>
-                                              DropdownMenuItem<String>(
-                                                value: e['code'],
-                                                child: Text(
-                                                  e['label']!,
-                                                  style: const TextStyle(
-                                                    fontWeight:
-                                                    FontWeight.w600,
-                                                    color: Colors.black87,
-                                                  ),
-                                                ),
-                                              ),
-                                        )
-                                            .toList(),
-                                        onChanged: (code) {
-                                          if (code == null) return;
-                                          setState(() =>
-                                          selectedLanguageCode = code);
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: _PersonaSegment(
-                                label: '내/외국인',
-                                value: selectedPersona,
-                                options: personas,
-                                onChanged: (v) =>
-                                    setState(() => selectedPersona = v),
+                            const _FieldLabel('언어'),
+                            const SizedBox(height: 6),
+                            DropdownButtonHideUnderline(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: _PostsTokens.chipBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: DropdownButton<String>(
+                                  value: selectedLanguageCode,
+                                  borderRadius: BorderRadius.circular(12),
+                                  icon: const Icon(Icons.expand_more,
+                                      size: 20, color: Colors.black87),
+                                  items: kLanguages
+                                      .map(
+                                        (e) =>
+                                        DropdownMenuItem<String>(
+                                          value: e['code'],
+                                          child: Text(
+                                            e['label']!,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                  )
+                                      .toList(),
+                                  onChanged: (code) {
+                                    if (code == null) return;
+                                    setState(() =>
+                                    selectedLanguageCode = code);
+                                  },
+                                ),
                               ),
                             ),
                           ],
@@ -1036,7 +989,7 @@ class _DropdownField extends StatelessWidget {
   }
 }
 
-/// 내/외국인 세그먼트
+/// 세그먼트 (게시판 유형/등)
 class _PersonaSegment extends StatelessWidget {
   final String label;
   final String value;

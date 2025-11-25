@@ -32,11 +32,16 @@ public class PostController {
 
     /**
      * 게시글 목록 조회
-     * - 공개로 둘 건지, 인증 사용자만 보게 할 건지는 SecurityConfig에서 결정
+     * - persona 쿼리 파라미터로 내국인/외국인 필터 가능
+     *   예) /api/posts?persona=LOCAL
+     *       /api/posts?persona=FOREIGN
+     *       /api/posts          (전체)
      */
     @GetMapping
-    public List<PostResponse> list() {
-        return service.listAll();
+    public List<PostResponse> list(
+            @RequestParam(required = false) String persona   // "LOCAL" / "FOREIGN" / "내국인" / "외국인" / "전체"
+    ) {
+        return service.listAll(persona);
     }
 
     /**
