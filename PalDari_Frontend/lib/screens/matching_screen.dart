@@ -375,12 +375,13 @@ class _MatchingScreenState extends State<MatchingScreen> {
 
       final roomName = (room['name'] ?? fallbackName).toString();
 
-      // 채팅방으로 이동
+// 채팅방으로 이동
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ChatRoomScreen(
             roomId: roomId,
+            buddyUserId: room['buddyUserId'],   // ⭐ 여기 추가 (정답)
             roomName: roomName,
           ),
         ),

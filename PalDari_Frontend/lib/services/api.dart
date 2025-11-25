@@ -588,10 +588,11 @@ class ApiService {
   /// 채팅방에서 Buddy 평점 남기기
   ///
   /// 백엔드 `POST /api/ratings` 와 연결됨.
-  /// - buddyId : 평가 받을 사람의 memberId
-  /// - chatRoomId : 어떤 채팅방/매칭에 대한 평가인지
-  /// - score : 1 ~ 5
-  /// - comment : 선택 사항 (null 또는 빈 문자열이면 전송 안 함)
+  /// - buddyId   : ⭐ 평가받는 사람의 userId (users.id)
+  ///               → 절대 memberId / roomMemberId 아님
+  /// - chatRoomId: 어떤 채팅방/매칭에 대한 평가인지
+  /// - score     : 1 ~ 5
+  /// - comment   : 선택 사항 (null 또는 빈 문자열이면 전송 안 함)
   Future<void> submitRating({
     required int buddyId,
     required int chatRoomId,
@@ -613,6 +614,7 @@ class ApiService {
       );
     }
   }
+
 
   /// 마이페이지용: 내가 받은 평점 요약 조회
   ///

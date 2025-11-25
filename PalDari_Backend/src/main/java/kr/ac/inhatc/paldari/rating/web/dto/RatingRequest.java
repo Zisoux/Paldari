@@ -11,7 +11,8 @@ import lombok.Setter;
 public class RatingRequest {
 
     /**
-     * 평가 받을 사람의 memberId
+     * 평가받는 사람의 userId (users.id)
+     * ⚠ 절대 memberId, roomMemberId가 아님
      */
     @NotNull
     private Long buddyId;

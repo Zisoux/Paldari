@@ -13,13 +13,20 @@ import 'buddy_rating_screen.dart'; // 버디 평가 화면
 
 class ChatRoomScreen extends StatefulWidget {
   final int roomId;
+
+  /// ⭐ 이 채팅방에서 대화하는 상대방의 userId (users.id)
+  ///    → 절대 roomId, memberId 아님
+  final int buddyUserId;
+
   final String roomName;
 
   const ChatRoomScreen({
     super.key,
     required this.roomId,
+    required this.buddyUserId, // ← 추가
     required this.roomName,
   });
+
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -304,9 +311,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => BuddyRatingScreen(
-          // TODO: 지금은 임시로 roomId/roomName 기반 값 사용
-          buddyId: widget.roomId, // 실제 buddyId로 바꾸기
-          chatRoomId: widget.roomId,
+          /// ⭐ 여기서는 반드시 "상대 userId (users.id)" 를 사용해야 함
+          buddyId: widget.buddyUserId,   // ✅ 수정: roomId → buddyUserId
+          chatRoomId: widget.roomId,     // ✅ 평점 대상 채팅방 id
           buddyName: widget.roomName,
           buddyImageUrl: '',
           tags: const [],
@@ -314,6 +321,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       ),
     );
   }
+
 
   // ---------- 시간 표시 포맷 ----------
   String _formatTime(String? iso) {

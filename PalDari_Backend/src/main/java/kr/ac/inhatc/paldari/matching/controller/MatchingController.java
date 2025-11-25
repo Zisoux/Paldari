@@ -107,8 +107,14 @@ public class MatchingController {
             @RequestBody MatchingChatRequest request
     ) {
         Long meId = currentUserId(authentication);
-        return matchingService.createOrGetChatRoom(meId, request.getTargetUserId());
+
+        // ⭐ matchingService는 ChatRoom 엔티티만 반환하도록 바꾸는 것이 원칙
+        var room = matchingService.createOrGetChatRoom(meId, request.getTargetUserId());
+
+        // ⭐ 여기서 buddyUserId를 세팅한 ChatRoomResponse를 생성
+        return ChatRoomResponse.from(room, meId);
     }
+
 
     @GetMapping("/home-pals")
     public List<PalSummaryResponse> homePals(Authentication authentication) {

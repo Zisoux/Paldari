@@ -2,7 +2,6 @@ package kr.ac.inhatc.paldari.matching.service;
 
 import kr.ac.inhatc.paldari.auth.entity.User;
 import kr.ac.inhatc.paldari.auth.repository.UserRepository;
-import kr.ac.inhatc.paldari.chats.dto.ChatRoomResponse;
 import kr.ac.inhatc.paldari.chats.entity.ChatRoom;
 import kr.ac.inhatc.paldari.chats.entity.ChatRoomMember;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomMemberRepository;
@@ -39,7 +38,6 @@ public class MatchingService {
         List<User> all = userRepository.findAllPalsForUser(currentUserId);
 
         // 2) 조건 값 정리 ("전체"/"무관"/"ALL"은 null 로)
-// 👉 국적/언어/성별/카테고리는 전용 normalizer 사용
         String nationality = normalizeNationality(condition.nationality());
         String category    = normalizeCategory(condition.category());
         String region      = normalizeFilter(condition.region());   // 활동 지역
@@ -214,7 +212,13 @@ public class MatchingService {
 
     // ===================== 채팅방 생성/조회 =====================
 
-    public ChatRoomResponse createOrGetChatRoom(Long currentUserId, Long targetUserId) {
+    /**
+     * 매칭에서 채팅 시작할 때 사용하는 메서드
+     * - 컨트롤러에서 현재 사용자 id(meId)를 알기 때문에
+     *   이 메서드는 "ChatRoom 엔티티"만 반환하고,
+     *   ChatRoomResponse 변환은 컨트롤러에서 처리.
+     */
+    public ChatRoom createOrGetChatRoom(Long currentUserId, Long targetUserId) {
         // 🔹 currentUserId / targetUserId 가 "DB PK"이거나,
         //    "숫자로 된 username(예: 1113)" 둘 다 처리할 수 있게 보강
         User me = findUserByIdOrNumericUsername(
@@ -231,7 +235,7 @@ public class MatchingService {
                 chatRoomMemberRepository.findDirectRoomBetweenUsers(me.getId(), target.getId());
 
         if (existing.isPresent()) {
-            return ChatRoomResponse.from(existing.get());
+            return existing.get(); // ⭐ 그대로 방 엔티티 반환
         }
 
         // 2) 없으면 새 방 생성
@@ -261,8 +265,8 @@ public class MatchingService {
         chatRoomMemberRepository.save(myMember);
         chatRoomMemberRepository.save(targetMember);
 
-        // 4) 응답 DTO로 변환
-        return ChatRoomResponse.from(room);
+        // 4) 방 엔티티 그대로 반환
+        return room;
     }
 
     // 홈 화면 기본 Pal 리스트 (목업 대신 DB 사용)
@@ -358,9 +362,6 @@ public class MatchingService {
             case "JP", "JAPAN" -> "JP";
             case "일본" -> "JP";
 
-            // 중국
-            case "CN", "CHINA" -> "CN";
-            case "중국" -> "CN";
 
             // 말레이시아
             case "MY", "MALAYSIA" -> "MY";
@@ -415,8 +416,6 @@ public class MatchingService {
             // 일본어
             case "ja", "japanese", "일본어", "日本語" -> "ja";
 
-            // 중국어
-            case "zh", "chinese", "중국어" -> "zh";
 
             // 말레이어
             case "ms", "malay", "bahasa melayu", "말레이어" -> "ms";
