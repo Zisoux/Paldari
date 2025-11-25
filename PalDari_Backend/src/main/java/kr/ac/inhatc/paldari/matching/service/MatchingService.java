@@ -13,10 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
@@ -144,17 +141,28 @@ public class MatchingService {
 
             // --- ④ 언어 ---
             if (language != null) {
-                // DB 값도 정규화 (ko / en / ja ... 코드 기준)
-                String userLang = (u.getLanguage() != null)
-                        ? normalizeLanguage(u.getLanguage())
-                        : null;
+                String langFilter = language; // 위에서 이미 normalizeLanguage 로 정규화된 값
 
-                if (userLang == null || !userLang.equalsIgnoreCase(language)) {
+                String langRaw = u.getLanguage();
+                List<String> userLangs = List.of();
+
+                if (langRaw != null && !langRaw.trim().isEmpty()) {
+                    userLangs = Arrays.stream(langRaw.split("\\s*,\\s*"))  // "ko,en,ja" → ["ko","en","ja"]
+                            .map(this::normalizeLanguage)                  // 각각 ko/en/ja 코드로 정규화
+                            .filter(Objects::nonNull)
+                            .toList();
+                }
+
+                boolean hasLang = userLangs.stream()
+                        .anyMatch(l -> l.equalsIgnoreCase(langFilter));
+
+                if (!hasLang) {
                     matched = false;
                 } else {
                     score += 2;
                 }
             }
+
 
             if (!matched) continue;
 
@@ -384,8 +392,11 @@ public class MatchingService {
 
     /**
      * 언어 정규화
-     * - "한국어"/"Korean"/"ko" → "ko"
-     * - "영어"/"English"/"en" → "en"
+     * - "한국어"/"Korean"/"ko"        → "ko"
+     * - "영어"/"English (US)" 등 전부 → "en"
+     * - "Bahasa Melayu"/"ms"         → "ms"
+     * - "Deutsch"/"독일어"/"de"      → "de"
+     * - "Français"/"프랑스어"/"fr"   → "fr"
      */
     private String normalizeLanguage(String s) {
         String v = normalizeFilter(s);
@@ -394,13 +405,32 @@ public class MatchingService {
         String lower = v.toLowerCase();
 
         return switch (lower) {
+            // 한국어
             case "ko", "korean", "한국어" -> "ko";
-            case "en", "english", "영어" -> "en";
-            case "ja", "japanese", "일본어" -> "ja";
+
+            // 영어 (모든 변형을 en 으로 통일)
+            case "en", "english", "영어",
+                 "english (us)", "english (uk)", "english (ca)", "english (au)" -> "en";
+
+            // 일본어
+            case "ja", "japanese", "일본어", "日本語" -> "ja";
+
+            // 중국어
             case "zh", "chinese", "중국어" -> "zh";
+
+            // 말레이어
+            case "ms", "malay", "bahasa melayu", "말레이어" -> "ms";
+
+            // 독일어
+            case "de", "german", "deutsch", "독일어" -> "de";
+
+            // 프랑스어
+            case "fr", "french", "français", "프랑스어" -> "fr";
+
             default -> v;
         };
     }
+
 
     /**
      * 성별 정규화
