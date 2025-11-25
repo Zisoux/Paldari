@@ -28,4 +28,8 @@ public class ProfileBasicDto {
 
     // 🔥 누락된 필드 추가
     private List<String> regions;    // 활동 지역 (예: ["Seoul", "Busan"])
+
+    // ⭐ 추가: 평점 정보 (Pal 프로필 표시용)
+    private Double ratingAverage;    // 받은 평점 평균 (예: 4.7)
+    private Long ratingTotalCount;   // 받은 평점 총 개수 (예: 23)
 }

@@ -41,8 +41,7 @@ class PalProfileScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Padding(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -91,8 +90,15 @@ class PalProfileScreen extends StatelessWidget {
                                       ),
                                   ],
                                 ),
-                                const SizedBox(height: 4),
-                                // 국적 (countries 리스트 기반으로 변경)
+
+                                const SizedBox(height: 6),
+
+                                // ⭐ Pal 평점 요약 (새로 추가)
+                                _PalRatingSummary(buddyId: pal.id),
+
+                                const SizedBox(height: 6),
+
+                                // 국적 (countries 리스트 기반)
                                 Text(
                                   pal.countries.isEmpty
                                       ? '국적: 미설정'
@@ -150,7 +156,9 @@ class PalProfileScreen extends StatelessWidget {
                             .map(
                               (t) => Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 5),
+                              horizontal: 12,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: PalColors.tagRedBg,
                               borderRadius:
@@ -199,8 +207,7 @@ class PalProfileScreen extends StatelessWidget {
                               (lang) => Chip(
                             label: Text(
                               lang,
-                              style:
-                              const TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: 12),
                             ),
                             backgroundColor: Colors.white,
                             materialTapTargetSize:
@@ -257,8 +264,10 @@ class PalProfileScreen extends StatelessWidget {
                         width: double.infinity,
                         height: 44,
                         child: ElevatedButton.icon(
-                          icon:
-                          const Icon(Icons.chat_bubble_outline, size: 18),
+                          icon: const Icon(
+                            Icons.chat_bubble_outline,
+                            size: 18,
+                          ),
                           onPressed: () async {
                             // 🔥 Pal.id 가 백엔드의 userId / memberId 와 매핑된다고 가정
                             final api = ApiService();
@@ -315,6 +324,93 @@ class PalProfileScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// =====================
+//  Pal 평점 요약 위젯 (추가)
+// =====================
+
+class _PalRatingSummary extends StatelessWidget {
+  const _PalRatingSummary({required this.buddyId});
+
+  final int buddyId;
+
+  @override
+  Widget build(BuildContext context) {
+    final api = ApiService();
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: api.fetchUserRatingSummary(buddyId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // 로딩 중에는 가벼운 텍스트로 처리
+          return const Text(
+            '평점 불러오는 중...',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black38,
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          // 에러가 나도 화면이 깨지지 않도록 안전하게 처리
+          return const Text(
+            '평점을 불러오지 못했어요',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black38,
+            ),
+          );
+        }
+
+        final data = snapshot.data;
+        if (data == null) {
+          return const SizedBox.shrink();
+        }
+
+        final total = (data['totalCount'] as num?)?.toInt() ?? 0;
+        final avg = (data['average'] as num?)?.toDouble() ?? 0.0;
+
+        if (total == 0) {
+          return const Text(
+            '아직 받은 평점이 없어요',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.black54,
+            ),
+          );
+        }
+
+        return Row(
+          children: [
+            const Icon(
+              Icons.star,
+              size: 18,
+              color: Colors.amber,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              avg.toStringAsFixed(1),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '($total명)',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black54,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

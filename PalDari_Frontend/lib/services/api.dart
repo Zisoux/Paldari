@@ -628,6 +628,28 @@ class ApiService {
     );
   }
 
+  /// Pal 프로필용: 특정 유저(Buddy)의 평점 요약 조회
+  ///
+  /// GET /api/ratings/summary/{buddyId}
+  /// -> { average, totalCount, count1, ..., count5 }
+  Future<Map<String, dynamic>> fetchUserRatingSummary(int buddyId) async {
+    final res = await _dio.get('/api/ratings/summary/$buddyId');
+
+    if (res.statusCode == 200) {
+      final data = res.data;
+      if (data is Map) {
+        return Map<String, dynamic>.from(data as Map);
+      }
+      throw Exception('Unexpected rating summary response format');
+    }
+
+    throw Exception(
+      'Failed to load user rating summary: '
+          '${res.statusCode} ${res.statusMessage}',
+    );
+  }
+
+
   Future<void> updateRealtimeTranslation(bool enabled) async {
     final res = await _dio.put(
       '/api/settings/me/translate',
