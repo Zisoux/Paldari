@@ -30,9 +30,19 @@ class _PostsScreenState extends State<PostsScreen> {
   String selectedGroup = '정보';
 
   final List<String> countries = const [
-    '말레이시아', '한국', '일본', '미국', '캐나다', '호주', '영국', '독일', '프랑스',
+    '전체', // ✅ 추가
+    '말레이시아',
+    '한국',
+    '일본',
+    '미국',
+    '캐나다',
+    '호주',
+    '영국',
+    '독일',
+    '프랑스',
   ];
-  String selectedCountry = '일본'; // 시안과 동일
+
+  String selectedCountry = '전체'; // ✅ 기본값을 전체로
 
   // 카테고리는 라벨로 관리, 코드 매핑은 헬퍼에서 처리
   final List<String> categories = const ['전체', '생활', '학업', '지역', '안전', '취업'];
@@ -182,7 +192,9 @@ class _PostsScreenState extends State<PostsScreen> {
 
       final groupMatch = postGroup == selectedGroup;
       final countryMatch =
-      selectedCountry.isEmpty ? true : postCountry.contains(selectedCountry);
+      (selectedCountry.isEmpty || selectedCountry == '전체')
+          ? true
+          : postCountry.contains(selectedCountry);
 
       // ✅ 카테고리 매칭: 코드 기준 ('ALL' 이면 전체)
       final categoryMatch = (selectedCategoryCode == 'ALL')
