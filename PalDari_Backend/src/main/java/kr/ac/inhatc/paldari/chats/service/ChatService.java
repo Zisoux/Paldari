@@ -11,9 +11,12 @@ import kr.ac.inhatc.paldari.chats.repository.ChatMessageRepository;
 import kr.ac.inhatc.paldari.chats.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -135,8 +138,9 @@ public class ChatService {
                         subText = buildSubTextForRoom(partner);
                         buddyId = partner.getId();
                     } else {
-                        name = room.getName();
-                        subText = room.getSubText();
+                        name = "(상대가 나감)";
+                        subText = "";          // 또는 "대화를 종료한 상대입니다"
+                        buddyId = 0L;          // ⭐ 프론트에서 0이면 상대 없음 처리
                     }
 
                     // ⭐ 나 자신의 멤버 정보
@@ -162,8 +166,6 @@ public class ChatService {
                         );
                     }
 
-
-
                     return ChatRoomResponse.builder()
                             .roomId(room.getId())
                             .name(name)
@@ -188,6 +190,25 @@ public class ChatService {
         if (countryText == null && living == null) return "";
         if (countryText != null && living != null) return countryText + " / " + living;
         return countryText != null ? countryText : living;
+    }
+
+    // 채팅방 나가기 로직
+    @Transactional
+    public void leaveRoom(Long roomId, Long userId) {
+
+        // 1) 멤버인지 확인
+        if (!chatRoomMemberRepository.existsByRoom_IdAndUser_Id(roomId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "해당 채팅방 멤버가 아닙니다.");
+        }
+
+        // 2) 멤버 row 삭제 = 내 목록에서 완전 삭제
+        chatRoomMemberRepository.deleteByRoom_IdAndUser_Id(roomId, userId);
+
+        // 3) 방에 남은 멤버가 0명이면 방 삭제
+        long remain = chatRoomMemberRepository.countByRoom_Id(roomId);
+        if (remain == 0) {
+            chatRoomRepository.deleteById(roomId);
+        }
     }
 
 }

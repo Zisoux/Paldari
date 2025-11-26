@@ -484,6 +484,18 @@ class ApiService {
     );
   }
 
+  // 채팅방 나가기
+  Future<void> leaveChatRoom(int roomId) async {
+    // 1순위
+    try {
+      await _dio.delete('/api/chat/$roomId');
+      return;
+    } catch (_) {
+      // 2순위(백업)
+    }
+    await _dio.delete('/api/chat/$roomId/leave');
+  }
+
   // ========== PROFILE (마이페이지 / 공개 프로필 공통) ==========
 
   /// 내 프로필 상세 조회 (마이페이지용)

@@ -11,7 +11,9 @@ import kr.ac.inhatc.paldari.chats.service.ChatService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -75,6 +77,17 @@ public class ChatController {
                         m.getSentAt().toString()
                 ))
                 .collect(Collectors.toList());
+    }
+
+    // (프론트 백업용으로 남겨도 됨)
+    @DeleteMapping("/{roomId}/leave")
+    public ResponseEntity<Void> leave(
+            @PathVariable Long roomId,
+            Authentication authentication
+    ) {
+        Long userId = currentUserId(authentication);
+        chatService.leaveRoom(roomId, userId);
+        return ResponseEntity.noContent().build();
     }
 
     // ====== 공통 헬퍼 ======
