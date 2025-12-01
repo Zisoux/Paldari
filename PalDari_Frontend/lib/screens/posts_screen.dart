@@ -87,17 +87,20 @@ class _PostsScreenState extends State<PostsScreen> {
   }
 
   Future<void> _onCreatePressed() async {
+    // 1️⃣ [수정] '전체'가 선택되어 있다면, 글쓰기 화면에는 '한국'을 기본값으로 넘김
+    // (NewPostScreen에는 '전체'라는 옵션이 없을 것이기 때문입니다)
+    final String countryToPass = (selectedCountry == '전체') ? '한국' : selectedCountry;
+
     final created = await Navigator.of(context).push<int>(
       MaterialPageRoute(
         builder: (_) => NewPostScreen(
-          initialCountry: selectedCountry,
-          initialCategory: selectedCategory, // 라벨 그대로 전달 (서버에서 정규화)
+          initialCountry: countryToPass, // ✅ 수정된 변수 전달
+          initialCategory: selectedCategory,
           initialLanguage: _langLabelOf(selectedLanguageCode),
-          boardGroup: selectedGroup, // ⭐ 지금 선택된 탭(정보/소통) 전달
+          boardGroup: selectedGroup,
         ),
       ),
     );
-
 
     if (created != null) {
       final result = await Navigator.of(context).push(
@@ -120,8 +123,12 @@ class _PostsScreenState extends State<PostsScreen> {
         title: const Text('삭제 확인'),
         content: const Text('이 게시글을 삭제할까요?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('삭제')),
         ],
       ),
     );
@@ -191,8 +198,7 @@ class _PostsScreenState extends State<PostsScreen> {
       })();
 
       final groupMatch = postGroup == selectedGroup;
-      final countryMatch =
-      (selectedCountry.isEmpty || selectedCountry == '전체')
+      final countryMatch = (selectedCountry.isEmpty || selectedCountry == '전체')
           ? true
           : postCountry.contains(selectedCountry);
 
@@ -348,6 +354,18 @@ class _PostsScreenState extends State<PostsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⭐ 여기 — build 시작 직후, return Scaffold 전에 넣는 자리 ⭐
+    final normalizedCode = _normalizeLangCode(selectedLanguageCode);
+
+    final safeLangValue = kLanguages.any((e) => e['code'] == normalizedCode)
+        ? normalizedCode
+        : 'all';
+
+    // ✅ [수정] 국가 값 안전 장치: selectedCountry가 목록에 없으면 첫번째 값 사용
+    final safeCountry = countries.contains(selectedCountry)
+        ? selectedCountry
+        : countries.first;
+
     return Scaffold(
       backgroundColor: hdr,
       appBar: AppBar(
@@ -357,7 +375,8 @@ class _PostsScreenState extends State<PostsScreen> {
         centerTitle: true,
         title: const Text(
           '커뮤니티',
-          style: TextStyle(color: Colors.black, fontSize: 22, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              color: Colors.black, fontSize: 22, fontWeight: FontWeight.w600),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
@@ -405,7 +424,8 @@ class _PostsScreenState extends State<PostsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: DropdownButton<String>(
-                        value: selectedCountry,
+                        // ✅ [수정] value를 safeCountry로 변경
+                        value: safeCountry,
                         borderRadius: BorderRadius.circular(12),
                         icon: const Icon(Icons.expand_more,
                             size: 20, color: Colors.black87),
@@ -422,11 +442,11 @@ class _PostsScreenState extends State<PostsScreen> {
                           ),
                         )
                             .toList(),
-                        onChanged: (v) =>
-                            setState(() => selectedCountry = v!),
+                        onChanged: (v) => setState(() => selectedCountry = v!),
                       ),
                     ),
                   ),
+
                   // 언어 드롭다운
                   const SizedBox(width: 8),
                   DropdownButtonHideUnderline(
@@ -437,7 +457,7 @@ class _PostsScreenState extends State<PostsScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: DropdownButton<String>(
-                        value: selectedLanguageCode,
+                        value: safeLangValue,
                         borderRadius: BorderRadius.circular(12),
                         icon: const Icon(Icons.expand_more,
                             size: 20, color: Colors.black87),
@@ -463,8 +483,7 @@ class _PostsScreenState extends State<PostsScreen> {
                   const SizedBox(width: 8),
                   Container(
                     decoration: BoxDecoration(
-                        color: chipBg,
-                        borderRadius: BorderRadius.circular(12)),
+                        color: chipBg, borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.all(2),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -478,8 +497,7 @@ class _PostsScreenState extends State<PostsScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 8),
                             decoration: BoxDecoration(
-                              color:
-                              selected ? darkTab : Colors.transparent,
+                              color: selected ? darkTab : Colors.transparent,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -514,20 +532,16 @@ class _PostsScreenState extends State<PostsScreen> {
                   return ChoiceChip(
                     label: Text(c),
                     selected: isSelected,
-                    onSelected: (_) =>
-                        setState(() => selectedCategory = c),
+                    onSelected: (_) => setState(() => selectedCategory = c),
                     selectedColor: brand,
                     backgroundColor: chipBg,
                     labelStyle: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : const Color(0xFF9F9FA1),
+                      color: isSelected ? Colors.white : const Color(0xFF9F9FA1),
                       fontWeight: FontWeight.w700,
                     ),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24)),
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                   );
                 },
               ),
@@ -543,8 +557,7 @@ class _PostsScreenState extends State<PostsScreen> {
                   ? Center(child: Text('에러: $error'))
                   : filteredPosts.isEmpty
                   ? ListView(
-                physics:
-                const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: const [
                   SizedBox(height: 200),
                   Center(
@@ -553,60 +566,43 @@ class _PostsScreenState extends State<PostsScreen> {
                 ],
               )
                   : ListView.builder(
-                padding:
-                const EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                     vertical: 8, horizontal: 12),
                 itemCount: filteredPosts.length,
                 itemBuilder: (_, i) {
                   final p = filteredPosts[i];
-                  final id =
-                  (p['id'] as num).toInt();
-                  final title =
-                  (p['title'] ?? '무제').toString();
-                  final content =
-                  (p['content'] ?? '').toString();
+                  final id = (p['id'] as num).toInt();
+                  final title = (p['title'] ?? '무제').toString();
+                  final content = (p['content'] ?? '').toString();
                   final author =
-                  (p['authorUsername'] ?? '-')
-                      .toString();
-                  final level =
-                  (p['level'] ?? 'Lv.3').toString();
+                  (p['authorUsername'] ?? '-').toString();
+                  final level = (p['level'] ?? 'Lv.3').toString();
                   final country =
-                  (p['country'] ?? '국가 미지정')
-                      .toString();
+                  (p['country'] ?? '국가 미지정').toString();
                   final createdAt =
-                  (p['createdAt'] ?? '')
-                      .toString();
+                  (p['createdAt'] ?? '').toString();
 
                   final rawCategory =
-                  (p['category'] ?? '전체')
-                      .toString();
+                  (p['category'] ?? '전체').toString();
                   final postCategoryCode =
-                  _categoryCodeFromAny(
-                      rawCategory);
+                  _categoryCodeFromAny(rawCategory);
                   final categoryLabel =
-                  _categoryLabelFromCode(
-                      postCategoryCode);
+                  _categoryLabelFromCode(postCategoryCode);
 
                   final likeCount =
-                  (p['likeCount'] ??
-                      p['likes'] ??
-                      0)
+                  (p['likeCount'] ?? p['likes'] ?? 0)
                       .toString();
                   final commentCount =
-                  (p['commentCount'] ??
-                      p['comments'] ??
-                      0)
+                  (p['commentCount'] ?? p['comments'] ?? 0)
                       .toString();
 
                   return GestureDetector(
                     onTap: () async {
-                      final result = await Navigator
-                          .of(context)
-                          .push(
+                      final result =
+                      await Navigator.of(context).push(
                         MaterialPageRoute(
                             builder: (_) =>
-                                PostDetailScreen(
-                                    postId: id)),
+                                PostDetailScreen(postId: id)),
                       );
                       if (result == 'deleted' ||
                           result == 'updated') {
@@ -614,114 +610,87 @@ class _PostsScreenState extends State<PostsScreen> {
                       }
                     },
                     child: Card(
-                      margin: const EdgeInsets
-                          .symmetric(vertical: 6),
+                      margin:
+                      const EdgeInsets.symmetric(vertical: 6),
                       elevation: 0.5,
                       color: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius:
-                          BorderRadius.circular(
-                              12)),
+                          BorderRadius.circular(12)),
                       child: Padding(
-                        padding:
-                        const EdgeInsets.fromLTRB(
+                        padding: const EdgeInsets.fromLTRB(
                             12, 12, 8, 10),
                         child: Column(
                           crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
+                          CrossAxisAlignment.start,
                           children: [
                             Row(
                               crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                              CrossAxisAlignment.start,
                               children: [
                                 CircleAvatar(
                                   radius: 16,
                                   backgroundColor:
-                                  const Color(
-                                      0xFFF39D52),
+                                  const Color(0xFFF39D52),
                                   child: Text(
-                                    _initials(
-                                        author),
-                                    style:
-                                    const TextStyle(
+                                    _initials(author),
+                                    style: const TextStyle(
                                       color: _PostsScreenState
                                           .brandText,
-                                      fontWeight:
-                                      FontWeight
-                                          .w700,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(
-                                    width: 10),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment:
-                                    CrossAxisAlignment
-                                        .start,
+                                    CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
-                                          Text(
-                                              author,
+                                          Text(author,
                                               style: const TextStyle(
-                                                  fontSize:
-                                                  14,
+                                                  fontSize: 14,
                                                   fontWeight:
-                                                  FontWeight.w600)),
-                                          const SizedBox(
-                                              width:
-                                              6),
-                                          Text(
-                                              level,
+                                                  FontWeight
+                                                      .w600)),
+                                          const SizedBox(width: 6),
+                                          Text(level,
                                               style: const TextStyle(
-                                                  fontSize:
-                                                  12,
-                                                  color:
-                                                  Colors.grey)),
-                                          const SizedBox(
-                                              width:
-                                              4),
+                                                  fontSize: 12,
+                                                  color: Colors
+                                                      .grey)),
+                                          const SizedBox(width: 4),
                                           const Icon(
                                               Icons
                                                   .verified_rounded,
-                                              size:
-                                              16,
-                                              color: Colors
-                                                  .green),
+                                              size: 16,
+                                              color:
+                                              Colors.green),
                                         ],
                                       ),
-                                      const SizedBox(
-                                          height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         '$country · $createdAt',
                                         style: const TextStyle(
-                                            fontSize:
-                                            12,
-                                            color: Colors
-                                                .grey),
+                                            fontSize: 12,
+                                            color: Colors.grey),
                                       ),
                                     ],
                                   ),
                                 ),
                                 IconButton(
                                   icon: const Icon(
-                                      Icons
-                                          .bookmark_border,
-                                      color: Colors
-                                          .black54),
-                                  onPressed:
-                                      () {}, // TODO: 북마크
+                                      Icons.bookmark_border,
+                                      color: Colors.black54),
+                                  onPressed: () {}, // TODO: 북마크
                                 ),
                                 IconButton(
                                   icon: const Icon(
                                       Icons.more_horiz,
-                                      color: Colors
-                                          .black54),
-                                  onPressed:
-                                      () {}, // TODO: 더보기 메뉴
+                                      color: Colors.black54),
+                                  onPressed: () {}, // TODO: 더보기 메뉴
                                 ),
                               ],
                             ),
@@ -730,20 +699,16 @@ class _PostsScreenState extends State<PostsScreen> {
                               title,
                               style: const TextStyle(
                                   fontSize: 16,
-                                  fontWeight:
-                                  FontWeight
-                                      .w700),
+                                  fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               content,
                               maxLines: 2,
-                              overflow:
-                              TextOverflow.ellipsis,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                   fontSize: 13.5,
-                                  color: Colors
-                                      .black87,
+                                  color: Colors.black87,
                                   height: 1.4),
                             ),
                             const SizedBox(height: 8),
@@ -758,42 +723,30 @@ class _PostsScreenState extends State<PostsScreen> {
                             Row(
                               children: [
                                 const Icon(
-                                    Icons
-                                        .thumb_up_alt_outlined,
+                                    Icons.thumb_up_alt_outlined,
                                     size: 14,
-                                    color:
-                                    Colors.grey),
+                                    color: Colors.grey),
                                 const SizedBox(width: 4),
                                 Text(likeCount,
-                                    style:
-                                    const TextStyle(
-                                        color: Colors
-                                            .grey)),
-                                const SizedBox(
-                                    width: 12),
+                                    style: const TextStyle(
+                                        color: Colors.grey)),
+                                const SizedBox(width: 12),
                                 const Icon(
-                                    Icons
-                                        .chat_bubble_outline,
+                                    Icons.chat_bubble_outline,
                                     size: 14,
-                                    color:
-                                    Colors.grey),
+                                    color: Colors.grey),
                                 const SizedBox(width: 4),
                                 Text(commentCount,
-                                    style:
-                                    const TextStyle(
-                                        color: Colors
-                                            .grey)),
+                                    style: const TextStyle(
+                                        color: Colors.grey)),
                                 const Spacer(),
                                 IconButton(
                                   icon: const Icon(
-                                      Icons
-                                          .delete_outline,
+                                      Icons.delete_outline,
                                       size: 18,
-                                      color: Colors
-                                          .redAccent),
+                                      color: Colors.redAccent),
                                   onPressed: () =>
-                                      _deletePost(
-                                          id),
+                                      _deletePost(id),
                                   tooltip: '삭제',
                                 ),
                               ],
@@ -823,14 +776,12 @@ class _PostsScreenState extends State<PostsScreen> {
     if (t.isEmpty) return '?';
     final parts = t.split(RegExp(r'\s+'));
     if (parts.length == 1) return parts.first.characters.first;
-    return (parts.first.characters.first +
-        parts.last.characters.first);
+    return (parts.first.characters.first + parts.last.characters.first);
   }
 
   Widget _tag(String text) {
     return Container(
-      padding:
-      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: chipBg,
         borderRadius: BorderRadius.circular(100),
@@ -871,20 +822,16 @@ class _GroupSegment extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 160),
-                padding:
-                const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color:
-                  selected ? darkTab : Colors.transparent,
+                  color: selected ? darkTab : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   g,
                   style: TextStyle(
-                    color: selected
-                        ? Colors.white
-                        : const Color(0xFF595959),
+                    color: selected ? Colors.white : const Color(0xFF595959),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
