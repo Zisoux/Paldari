@@ -221,6 +221,14 @@ class _MatchingScreenState extends State<MatchingScreen> {
   // 카테고리 리스트 (그대로)
   final categories = const ['생활', '학업', '지역', '안전', '취업'];
 
+  /// ✅ dynamic -> int? 안전 변환
+  int? _toInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
+
   // ---------------- 매칭 공통 로직 ----------------
 
   /// 매칭 시작 (조건 기반 / 랜덤 선택)
@@ -254,9 +262,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              random
-                  ? '매칭 가능한 Pal이 없어요. 😢'
-                  : '조건에 맞는 Pal을 찾지 못했어요.',
+              random ? '매칭 가능한 Pal이 없어요. 😢' : '조건에 맞는 Pal을 찾지 못했어요.',
             ),
           ),
         );
@@ -287,12 +293,13 @@ class _MatchingScreenState extends State<MatchingScreen> {
     final lang = (pal['language'] ?? '').toString();
     final intro = (pal['introduction'] ?? '').toString();
 
-    final targetUserId = pal['id'];
-    if (targetUserId == null) {
-      // 백엔드 응답 형식이 바뀌어서 id가 없으면 그냥 안내만
+    // ✅ id 안전 변환 (null/num/string 대비)
+    final targetUserIdInt = _toInt(pal['id']);
+    if (targetUserIdInt == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('매칭 정보에 사용자 ID가 없어요. 백엔드 응답을 확인해주세요.')),
+          content: Text('매칭 정보에 사용자 ID(id)가 없어요. 백엔드 응답을 확인해주세요.'),
+        ),
       );
       return;
     }
@@ -343,7 +350,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.of(context).pop(); // 모달 닫고 채팅 생성 진행
-                await _createChatAndOpen(targetUserId as int, nickname);
+                await _createChatAndOpen(
+                  targetUserId: targetUserIdInt,
+                  fallbackName: nickname,
+                );
               },
               child: const Text('채팅 시작'),
             ),
@@ -354,34 +364,42 @@ class _MatchingScreenState extends State<MatchingScreen> {
   }
 
   /// 채팅방 생성 후 바로 ChatRoomScreen으로 이동
-  Future<void> _createChatAndOpen(int targetUserId, String fallbackName) async {
+  Future<void> _createChatAndOpen({
+    required int targetUserId,
+    required String fallbackName,
+  }) async {
     setState(() => _loading = true);
+
     try {
       final room = await _api.createChatForMatching(targetUserId: targetUserId);
 
       if (!mounted) return;
 
       final roomIdDynamic = room['roomId'] ?? room['id'];
-      if (roomIdDynamic == null) {
+      final roomId = _toInt(roomIdDynamic) ?? 0;
+
+      if (roomId == 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('채팅방 ID를 찾을 수 없어요. 응답 형식을 확인해주세요.')),
         );
         return;
       }
 
-      final roomId = roomIdDynamic is int
-          ? roomIdDynamic
-          : int.tryParse(roomIdDynamic.toString()) ?? 0;
-
       final roomName = (room['name'] ?? fallbackName).toString();
 
-// 채팅방으로 이동
+      // ✅ buddyUserId null 방지 (여기가 기존 크래시의 1순위 원인)
+      final buddyUserId = _toInt(
+        room['buddyUserId'] ?? room['buddyId'] ?? room['partnerId'],
+      ) ??
+          targetUserId; // 없으면 매칭 상대 id로 fallback
+
+      // 채팅방으로 이동
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => ChatRoomScreen(
             roomId: roomId,
-            buddyUserId: room['buddyUserId'],   // ⭐ 여기 추가 (정답)
+            buddyUserId: buddyUserId,
             roomName: roomName,
           ),
         ),
@@ -462,8 +480,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         label: Text(n),
                         selected: selectedNationality == n,
                         selectedColor: orange.withOpacity(0.6),
-                        onSelected: (_) =>
-                            setState(() => selectedNationality = n),
+                        onSelected: (_) => setState(() => selectedNationality = n),
                       ),
                   ],
                 ),
@@ -493,8 +510,7 @@ class _MatchingScreenState extends State<MatchingScreen> {
                         label: Text(c),
                         selected: selectedCategory == c,
                         selectedColor: orange.withOpacity(0.6),
-                        onSelected: (_) =>
-                            setState(() => selectedCategory = c),
+                        onSelected: (_) => setState(() => selectedCategory = c),
                       ),
                   ],
                 ),
@@ -552,12 +568,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side:
-                        BorderSide(color: Colors.black.withOpacity(0.5)),
+                        side: BorderSide(color: Colors.black.withOpacity(0.5)),
                       ),
                     ),
-                    onPressed:
-                    _loading ? null : () => _startMatching(random: false),
+                    onPressed: _loading ? null : () => _startMatching(random: false),
                     child: const Text(
                       '매칭 시작',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -595,12 +609,10 @@ class _MatchingScreenState extends State<MatchingScreen> {
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side:
-                        BorderSide(color: Colors.black.withOpacity(0.5)),
+                        side: BorderSide(color: Colors.black.withOpacity(0.5)),
                       ),
                     ),
-                    onPressed:
-                    _loading ? null : () => _startMatching(random: true),
+                    onPressed: _loading ? null : () => _startMatching(random: true),
                     child: const Text(
                       '조건 없이 빠른 대화 시작',
                       style: TextStyle(fontWeight: FontWeight.w600),
@@ -698,25 +710,13 @@ class _AdvancedFilters extends StatelessWidget {
           items: const [
             DropdownMenuItem(value: '한국어', child: Text('한국어')),
             DropdownMenuItem(value: 'English (US)', child: Text('English (US)')),
-            DropdownMenuItem(
-              value: 'Bahasa Melayu',
-              child: Text('Bahasa Melayu'),
-            ),
+            DropdownMenuItem(value: 'Bahasa Melayu', child: Text('Bahasa Melayu')),
             DropdownMenuItem(value: '日本語', child: Text('日本語')),
             DropdownMenuItem(value: 'Deutsch', child: Text('Deutsch')),
             DropdownMenuItem(value: 'Français', child: Text('Français')),
-            DropdownMenuItem(
-              value: 'English (UK)',
-              child: Text('English (UK)'),
-            ),
-            DropdownMenuItem(
-              value: 'English (CA)',
-              child: Text('English (CA)'),
-            ),
-            DropdownMenuItem(
-              value: 'English (AU)',
-              child: Text('English (AU)'),
-            ),
+            DropdownMenuItem(value: 'English (UK)', child: Text('English (UK)')),
+            DropdownMenuItem(value: 'English (CA)', child: Text('English (CA)')),
+            DropdownMenuItem(value: 'English (AU)', child: Text('English (AU)')),
           ],
           onChanged: onLanguageChanged,
           decoration: _fieldDecoration(),
@@ -745,8 +745,7 @@ class _AdvancedFilters extends StatelessWidget {
       isDense: true,
       filled: true,
       fillColor: Colors.white,
-      contentPadding:
-      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFFF29D52), width: 1),
@@ -855,8 +854,7 @@ class _RegionPickerBottomSheetForMatchingState
                         ? '선택된 지역이 없습니다.'
                         : '선택된 지역: $_selectedRegion',
                     style: TextStyle(
-                      color:
-                      _selectedRegion == null ? Colors.grey : Colors.black,
+                      color: _selectedRegion == null ? Colors.grey : Colors.black,
                     ),
                   ),
                 ),
