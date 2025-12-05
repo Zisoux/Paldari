@@ -420,18 +420,41 @@ class ApiService {
 
   // ========== TRANSLATION (Papago via backend) ==========
 
+  String _normLang(String v) => v.trim().toLowerCase();
+
+  // 동일 문장 반복 감지 방지 캐시
+  final Map<String, String> _langCache = {};
+
+  bool _detectable(String t) => t.trim().length >= 5;
+
   /// 언어 감지
   Future<String> detectLanguage(String text) async {
+    final q = text.trim();
+
+    // ✅ 빈 값/너무 짧은 값은 감지하지 않음
+    if (q.isEmpty) return 'auto';
+    if (!_detectable(q)) return 'auto';
+
+    // ✅ 캐시 히트
+    final cached = _langCache[q];
+    if (cached != null) return cached;
+
     final res = await _dio.post(
       '/api/translate/detect',
-      data: {'text': text},
+      data: {'text': q},
     );
 
     if (res.statusCode == 200) {
       final data = res.data;
+
       if (data is Map && data['langCode'] is String) {
-        return data['langCode'] as String;
+        final code = _normLang(data['langCode'] as String);
+
+        // ✅ 캐시 저장
+        _langCache[q] = code;
+        return code;
       }
+
       throw Exception('Unexpected detectLanguage response format: $data');
     }
 
@@ -439,6 +462,7 @@ class ApiService {
       'Failed to detect language: ${res.statusCode} ${res.statusMessage}',
     );
   }
+
 
   /// 텍스트 번역
   Future<String> translateText({
@@ -468,21 +492,50 @@ class ApiService {
     );
   }
 
-  /// 자동 번역 헬퍼
+  /// 자동 번역 헬퍼 (상호번역용)
   Future<String> autoTranslate({
     required String text,
     required String targetLang,
   }) async {
-    final detected = await detectLanguage(text);
+    final t = text.trim();
+    if (t.isEmpty) return text;
+    if (!_detectable(t)) return text; // ✅ 짧으면 번역 스킵
 
-    if (detected == targetLang) return text;
+    final tgt = _normLang(targetLang);
 
+    final detected = _normLang(await detectLanguage(t)); // detectLanguage는 auto 가능
+
+    // ✅ 감지가 불확실(auto)이거나 이미 같은 언어면 번역 스킵
+    if (detected == 'auto' || detected == tgt) return text;
+
+    // ✅ 번역 호출은 source를 auto로 (감지 흔들림 흡수)
     return translateText(
-      text: text,
-      sourceLang: detected,
-      targetLang: targetLang,
+      text: t,
+      sourceLang: 'auto',
+      targetLang: tgt,
     );
   }
+
+  /// 테스트용: 영<->한 상호 번역만
+  Future<String> autoTranslateEnKo({required String text}) async {
+    final t = text.trim();
+    if (t.isEmpty) return text;
+    if (t.length < 3) return text; // 짧으면 스킵(원하시면 5로)
+
+    final detected = _normLang(await detectLanguage(t)); // 'en' or 'ko' 기대
+
+    String? target;
+    if (detected == 'en') target = 'ko';
+    else if (detected == 'ko') target = 'en';
+    else return text; // en/ko 아니면 스킵
+
+    return translateText(
+      text: t,
+      sourceLang: 'auto',
+      targetLang: target,
+    );
+  }
+
 
   // 채팅방 나가기
   Future<void> leaveChatRoom(int roomId) async {

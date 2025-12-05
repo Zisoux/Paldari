@@ -163,7 +163,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
 
-  // 이미 로드된 메시지들을 번역
+  // 이미 로드된 메시지들을 번역 (테스트용: 영<->한 상호번역)
   Future<void> _translateExistingMessages() async {
     if (!_translateEnabled) return;
     if (!mounted) return;
@@ -171,23 +171,38 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final auth = context.read<AuthState>();
     final currentUser = auth.username ?? '';
 
-    final locale = Localizations.localeOf(context);
-    final targetLang = 'ko';// locale.languageCode; -- 기존 앱 설정 따르기
-
     for (final m in _messages) {
       if (m.type != 'TALK') continue;
-      if (m.sender == currentUser) continue;
+      if (m.sender == currentUser) continue; // 상대 메시지만
       if (m.translatedContent != null) continue;
 
+      final text = m.content.trim();
+      if (text.isEmpty) continue;
+      if (text.length < 3) continue; // 짧은 건 감지/번역 스킵(원하면 5로)
+
       try {
+        // 1) 언어 감지
+        final detected = (await _api.detectLanguage(text)).trim().toLowerCase();
+
+        // 2) en<->ko만 타깃 결정
+        String? targetLang;
+        if (detected == 'en') {
+          targetLang = 'ko';
+        } else if (detected == 'ko') {
+          targetLang = 'en';
+        } else {
+          continue; // en/ko 아니면 테스트 단계에선 스킵
+        }
+
+        // 3) 번역
         final translated = await _api.translateText(
-          text: m.content,
+          text: text,
           sourceLang: 'auto',
           targetLang: targetLang,
         );
 
         if (!mounted) return;
-        if (translated == m.content) continue;
+        if (translated == text) continue;
 
         setState(() {
           m.translatedContent = translated;
@@ -197,6 +212,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       }
     }
   }
+
 
   // ---------- STOMP 연결 ----------
   void _connect() {
@@ -270,7 +286,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
   }
 
-  // 새로 도착한 메시지 처리 + 자동 번역
+  // 새로 도착한 메시지 처리 + 자동 번역 (테스트용: 영<->한 상호번역)
   Future<void> _handleIncomingMessage(ChatMessageDto msg) async {
     if (!mounted) return;
 
@@ -282,21 +298,36 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     });
 
     if (msg.type != 'TALK') return;
-    if (msg.sender == currentUser) return;
+    if (msg.sender == currentUser) return; // 내 메시지는 번역 안함
     if (!_translateEnabled) return;
 
-    try {
-      final locale = Localizations.localeOf(context);
-      final targetLang = locale.languageCode;
+    final text = msg.content.trim();
+    if (text.isEmpty) return;
+    if (text.length < 3) return; // 짧은 건 스킵(원하면 5로)
 
+    try {
+      // 1) 언어 감지
+      final detected = (await _api.detectLanguage(text)).trim().toLowerCase();
+
+      // 2) en<->ko만 타깃 결정
+      String? targetLang;
+      if (detected == 'en') {
+        targetLang = 'ko';
+      } else if (detected == 'ko') {
+        targetLang = 'en';
+      } else {
+        return; // en/ko 아니면 테스트 단계에선 스킵
+      }
+
+      // 3) 번역
       final translated = await _api.translateText(
-        text: msg.content,
+        text: text,
         sourceLang: 'auto',
         targetLang: targetLang,
       );
 
       if (!mounted) return;
-      if (translated == msg.content) return;
+      if (translated == text) return;
 
       setState(() {
         msg.translatedContent = translated;
@@ -305,6 +336,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       debugPrint('autoTranslate error: $e\n$st');
     }
   }
+
 
   // ---------- 메시지 전송 ----------
   void _send() {

@@ -27,6 +27,10 @@ public class TranslationController {
     // 🔹 언어 감지 엔드포인트
     @PostMapping("/detect")
     public DetectLanguageResponse detect(@RequestBody DetectLanguageRequest req) {
+        String text = req.getText();
+        if (text == null || text.isBlank() || text.trim().length() < 3) {
+            return new DetectLanguageResponse("auto");
+        }
         String langCode = papagoLanguageDetectionService.detectLanguage(req.getText());
         return new DetectLanguageResponse(langCode);
     }
