@@ -26,6 +26,44 @@ public class PostService {
     private final PostRepository repo;
     private final UserRepository userRepository;
 
+    private String normalizeCountry(String raw) {
+        if (raw == null) return null;
+        raw = raw.trim();
+
+        return switch (raw) {
+
+            // 🇲🇾 말레이시아
+            case "말레이시아", "Malaysia", "MY", "my", "malaysia" -> "말레이시아";
+
+            // 🇰🇷 한국
+            case "한국", "대한민국", "Korea", "South Korea", "KR", "kor", "korea" -> "한국";
+
+            // 🇯🇵 일본
+            case "일본", "Japan", "JP", "japan" -> "일본";
+
+            // 🇺🇸 미국
+            case "미국", "USA", "United States", "US", "america", "us" -> "미국";
+
+            // 🇨🇦 캐나다
+            case "캐나다", "Canada", "CA", "canada" -> "캐나다";
+
+            // 🇦🇺 호주
+            case "호주", "Australia", "AU", "australia" -> "호주";
+
+            // 🇬🇧 영국
+            case "영국", "United Kingdom", "UK", "England", "GB", "uk" -> "영국";
+
+            // 🇩🇪 독일
+            case "독일", "Germany", "DE", "germany" -> "독일";
+
+            // 🇫🇷 프랑스
+            case "프랑스", "France", "FR", "france" -> "프랑스";
+
+            default -> raw; // 알 수 없는 값은 그대로 반환
+        };
+    }
+
+
     /**
      * 🔹 기존 전체 조회 (필터 없이)
      *   - 다른 곳에서 사용 중일 수 있어 그대로 둠
@@ -238,23 +276,26 @@ public class PostService {
             return;
         }
 
-        List<String> userCountries = author.getCountries();  // ✅ User.countries 사용
-        String postCountry = post.getCountry();
+        // ⭐ 국가명 정규화 함수 사용
+        String postCountry = normalizeCountry(post.getCountry());
+        List<String> userCountries = author.getCountries()
+                .stream()
+                .map(this::normalizeCountry)
+                .filter(c -> c != null && !c.isBlank())
+                .toList();
 
-        if (postCountry == null || postCountry.isBlank()
-                || userCountries == null || userCountries.isEmpty()) {
+        if (postCountry == null || postCountry.isBlank() || userCountries.isEmpty()) {
             post.setIsForeigner(null);
             post.setPersona(null);
             return;
         }
 
-        // ⚠️ user.countries 와 post.country 가 같은 포맷이라는 전제 (예: 둘 다 "KR" 같은 코드)
-        boolean isLocal = userCountries.stream()
-                .filter(c -> c != null && !c.isBlank())
-                .anyMatch(c -> c.equalsIgnoreCase(postCountry));
+// ⭐ 정규화된 국가끼리 비교
+        boolean isLocal = userCountries.contains(postCountry);
 
         post.setIsForeigner(!isLocal);
         post.setPersona(isLocal ? "LOCAL" : "FOREIGN");
+
     }
 
     // ─────────── 라벨/코드 정규화 헬퍼 ───────────

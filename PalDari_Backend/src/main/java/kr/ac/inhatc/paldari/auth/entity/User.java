@@ -104,4 +104,47 @@ public class User {
     // 🔹 유저 설정 (알람, 매칭 허용, 실시간 번역)
     @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
     private UserSettings settings;
+
+    public void setCountries(List<String> countries) {
+        this.countries = countries.stream()
+                .map(c -> c == null ? null : c.trim())
+                .map(c -> switch (c) {
+
+                    // 🇲🇾 말레이시아
+                    case "말레이시아", "Malaysia", "MY", "my", "malaysia" -> "말레이시아";
+
+                    // 🇰🇷 한국
+                    case "한국", "대한민국", "Korea", "South Korea",
+                         "KR", "kr", "kor", "korea" -> "한국";
+
+                    // 🇯🇵 일본
+                    case "일본", "Japan", "JP", "jp", "japan" -> "일본";
+
+                    // 🇺🇸 미국
+                    case "미국", "USA", "US", "United States",
+                         "america", "usa", "us" -> "미국";
+
+                    // 🇨🇦 캐나다
+                    case "캐나다", "Canada", "CA", "ca", "canada" -> "캐나다";
+
+                    // 🇦🇺 호주
+                    case "호주", "Australia", "AU", "au", "australia" -> "호주";
+
+                    // 🇬🇧 영국
+                    case "영국", "United Kingdom", "UK", "GB",
+                         "England", "uk", "gb", "england" -> "영국";
+
+                    // 🇩🇪 독일
+                    case "독일", "Germany", "DE", "de", "germany" -> "독일";
+
+                    // 🇫🇷 프랑스
+                    case "프랑스", "France", "FR", "fr", "france" -> "프랑스";
+
+                    default -> c;
+                })
+                .toList();
+    }
+
+
 }
+

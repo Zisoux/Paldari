@@ -107,7 +107,20 @@ public class Post {
     public void setContent(String content) { this.content = content; }
 
     public String getCountry() { return country; }
-    public void setCountry(String country) { this.country = country; }
+    public void setCountry(String country) {
+        if (country == null) {
+            this.country = null;
+            return;
+        }
+
+        this.country = switch (country.trim()) {
+            case "한국", "대한민국", "Korea", "KR", "South Korea" -> "한국";
+            case "말레이시아", "Malaysia", "MY" -> "말레이시아";
+            case "일본", "Japan", "JP" -> "일본";
+            case "미국", "USA", "US" -> "미국";
+            default -> country.trim();
+        };
+    }
 
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
