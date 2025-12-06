@@ -1,36 +1,84 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:paldari/screens/edit_profile_screen.dart';
+import 'package:paldari/screens/matching_screen.dart';
+import 'package:paldari/screens/settings_screen.dart';
+import 'package:provider/provider.dart';
 
-void main() => runApp(MyApp());
+import 'providers/auth_provider.dart';
+import 'screens/login_screen.dart';
+import 'screens/signup_screen.dart';
+import 'screens/find_email_screen.dart';
+import 'screens/find_pw_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/oauth_success_screen.dart';
+import 'screens/posts_screen.dart';
+import 'screens/chat_list_screen.dart';
+import 'screens/my_page_screen.dart';
+
+void main() {
+  if (kIsWeb) {
+    // /#/oauth-success 대신 /oauth-success 형태로 사용
+    usePathUrlStrategy();
+  }
+
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key}); // const 생성자 추가
-
-  // Spring Boot 서버 테스트 함수
-  Future<void> testBackend() async {
-    final url = Uri.parse('http://10.0.2.2:8080/hello'); // Android 에뮬레이터에서 로컬 서버 접근
-    final response = await http.get(url);
-
-    if (response.statusCode == 200) {
-      print(response.body); // 콘솔에 Hello World 출력
-    } else {
-      print('Error: ${response.statusCode}');
-    }
-  }
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('Spring Boot Test')),
-        body: Center(
-          child: ElevatedButton(
-            onPressed: testBackend,       // 버튼 누르면 서버 호출
-            child: const Text('Test Backend'),
-          ),
-        ),
+    return ChangeNotifierProvider(
+      // ✅ AuthState는 내부에서 AuthService + ApiClient + SecureStorage 생성
+      create: (_) => AuthState(),
+      child: MaterialApp(
+        title: 'Paldari',
+        debugShowCheckedModeBanner: false,
+        initialRoute: '/',
+
+        onGenerateRoute: (settings) {
+          final uri = Uri.parse(settings.name ?? '/');
+
+          // ✅ OAuth 성공 콜백 처리
+          if (uri.path == '/oauth-success') {
+            // access / refresh는 OAuthSuccessScreen 안에서 Uri.base로 직접 읽음
+            return MaterialPageRoute(
+              builder: (_) => const OAuthSuccessScreen(),
+              settings: settings,
+            );
+          }
+
+          switch (uri.path) {
+            case '/':
+              return MaterialPageRoute(builder: (_) => const LoginScreen());
+            case '/signup':
+              return MaterialPageRoute(builder: (_) => const SignupScreen());
+            case '/findEmail':
+              return MaterialPageRoute(builder: (_) => const FindEmailScreen());
+            case '/findPW':
+              return MaterialPageRoute(builder: (_) => const FindPwScreen());
+            case '/home':
+              return MaterialPageRoute(builder: (_) => const PalHomeScreen());
+            case '/matching':
+              return MaterialPageRoute(builder: (_) => const MatchingScreen());
+            case '/posts':
+              return MaterialPageRoute(builder: (_) => const PostsScreen());
+            case '/chats':
+              return MaterialPageRoute(builder: (_) => const ChatListScreen());
+            case '/myPage':
+              return MaterialPageRoute(builder: (_) => const MyPageScreen());
+            case '/editProfile':
+              return MaterialPageRoute(builder: (_) => const EditProfileScreen());
+            case '/settings':
+              return MaterialPageRoute(builder: (_) => const SettingsScreen());
+            default:
+              return MaterialPageRoute(builder: (_) => const LoginScreen());
+          }
+        },
       ),
     );
   }
 }
-

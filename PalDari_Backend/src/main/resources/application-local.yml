@@ -1,0 +1,3 @@
+app:
+  # 네가 실제로 쓰고 싶은 경로
+  upload-dir: "${user.home}/paldari-uploads"
