@@ -1,4 +1,3 @@
 app:
   # 네가 실제로 쓰고 싶은 경로
-  # /Users/test 밑에 'paldari-uploads' 폴더를 만든다는 가정
-  upload-dir: "/Users/test/paldari-uploads"
+  upload-dir: "${user.home}/paldari-uploads"
