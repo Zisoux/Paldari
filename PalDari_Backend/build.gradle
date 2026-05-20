@@ -27,6 +27,8 @@ repositories {
 dependencies {
     // Spring Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    // redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     // OAuth2 Client (구글, 네이버, 카카오 등)
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     // JWT

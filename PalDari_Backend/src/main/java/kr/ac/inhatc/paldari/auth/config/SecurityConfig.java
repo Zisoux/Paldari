@@ -75,6 +75,7 @@ public class SecurityConfig {
                                 "/login/oauth2/**",
                                 "/oauth-success"
                         ).permitAll()
+                        .requestMatchers("/api/translate/test/**").permitAll()
                         // 정적 리소스 & 웹소켓 엔드포인트
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/ws-chat/**").permitAll()

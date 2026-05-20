@@ -8,6 +8,7 @@ import 'package:stomp_dart_client/stomp_dart_client.dart';
 import '../config.dart';
 import '../providers/auth_provider.dart';
 import '../services/api.dart'; // 번역용 ApiService 사용
+import '../services/translation_test_service.dart'; // 번역 테스트용 서비스
 import 'chat_list_screen.dart'; // 뒤로가기 시 채팅방 리스트로 이동
 import 'buddy_rating_screen.dart'; // 버디 평가 화면
 
@@ -65,6 +66,8 @@ class ChatMessageDto {
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   StompClient? _stompClient;
   bool _connected = false;
+
+  static const String testApiBase = 'http://10.0.2.2:8080';
 
   // 🔹 전역 설정과 연동되는 실시간 번역 on/off
   bool _translateEnabled = false;
@@ -337,6 +340,121 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
+
+
+  // ---------- PalDari 실제 Papago API 응답시간 테스트 ----------
+  Future<void> _resetTranslationTest() async {
+    final uri = Uri.parse('$testApiBase/api/translate/test/papago-reset');
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      final response = await http.post(uri);
+      stopwatch.stop();
+
+      debugPrint('================ PalDari Papago Test Reset ================');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('App Response Time: ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('============================================================');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Papago Reset 완료 (${response.statusCode})'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      stopwatch.stop();
+
+      debugPrint('================ PalDari Papago Test Reset Error ================');
+      debugPrint('App Response Time: ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint('Error: $e');
+      debugPrint('=================================================================');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Papago Reset 실패: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _testTranslationApi({
+    required bool useRedis,
+    String sourceLang = 'ko',
+    String targetLang = 'en',
+    String text = '안녕하세요',
+  }) async {
+    final mode = useRedis ? 'papago-redis-cache' : 'papago-no-cache';
+
+    final uri = Uri.parse('$testApiBase/api/translate/test/$mode').replace(
+      queryParameters: {
+        'sourceLang': sourceLang,
+        'targetLang': targetLang,
+        'text': text,
+      },
+    );
+
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      final response = await http.get(uri);
+      stopwatch.stop();
+
+      debugPrint('================ PalDari Papago Translation Test ================');
+      debugPrint('Mode: $mode');
+      debugPrint('Request: $sourceLang -> $targetLang / "$text"');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('App Response Time: ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint('Response Body: ${response.body}');
+      debugPrint('================================================================');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$mode 응답시간: ${stopwatch.elapsedMilliseconds} ms'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      stopwatch.stop();
+
+      debugPrint('================ PalDari Papago Translation Test Error ================');
+      debugPrint('Mode: $mode');
+      debugPrint('Request: $sourceLang -> $targetLang / "$text"');
+      debugPrint('App Response Time: ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint('Error: $e');
+      debugPrint('=====================================================================');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$mode 테스트 실패: $e'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _runTranslationTestSequence() async {
+    debugPrint('================ PalDari Papago Basic Translation Test Start ================');
+
+    // Papago No Cache: 동일 번역 요청을 2회 전송한다.
+    await _resetTranslationTest();
+    await _testTranslationApi(useRedis: false);
+    await _testTranslationApi(useRedis: false);
+
+    // Papago Redis Cache: 첫 요청은 Cache Miss, 이후 동일 요청은 Cache Hit를 기대한다.
+    await _resetTranslationTest();
+    await _testTranslationApi(useRedis: true);
+    await _testTranslationApi(useRedis: true);
+    await _testTranslationApi(useRedis: true);
+
+    debugPrint('================ PalDari Papago Basic Translation Test End ================');
+  }
 
   // ---------- 메시지 전송 ----------
   void _send() {
@@ -629,6 +747,26 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
           const Spacer(),
+          // 번역 테스트 Reset 버튼
+          IconButton(
+            icon: const Icon(
+              Icons.restart_alt,
+              color: Color(0xFF734124),
+              size: 22,
+            ),
+            tooltip: '번역 테스트 Reset',
+            onPressed: _resetTranslationTest,
+          ),
+          // 번역 테스트 실행 버튼
+          IconButton(
+            icon: const Icon(
+              Icons.speed,
+              color: Color(0xFF734124),
+              size: 22,
+            ),
+            tooltip: '번역 테스트 실행',
+            onPressed: _runTranslationTestSequence,
+          ),
           // 버디 평가 버튼
           IconButton(
             icon: const Icon(

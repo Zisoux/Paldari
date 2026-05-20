@@ -82,6 +82,15 @@ spring:
     password: 1234
 
   ####################################
+  # redis
+  ####################################
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+
+  ####################################
   # JPA
   ####################################
   jpa:
@@ -114,5 +123,5 @@ papago:
   base-url: https://papago.apigw.ntruss.com
   text-path: /nmt/v1/translation
   detect-path: /langs/v1/dect
-  api-key-id: sqs22u4051
-  api-key: 4maLz4vXfq5CoLUXFq5asXOandETHKWtxzbGwwks
+  api-key-id: i3r490l5gl
+  api-key: hj7A3rgFCYIEQDj6YEE3qyvsWXSUVfvsAbzgQYEf
