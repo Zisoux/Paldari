@@ -1,14 +1,29 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 
-/// Web(Chrome) / Android Emulator 환경 분기용
-/// - Web: localhost:8080 (PC에서 같이 띄운 백엔드)
-/// - Mobile/Emulator: 10.0.2.2:8080 (에뮬레이터 -> 호스트 PC)
+/// Web / Android Emulator / iOS Simulator 환경 분기용
+/// - Web: localhost:8080
+/// - Android Emulator: 10.0.2.2:8080
+/// - iOS Simulator: localhost:8080
 const String _webBase = 'http://localhost:8080';
-const String _mobileBase = 'http://10.0.2.2:8080';
+const String _androidEmulatorBase = 'http://10.0.2.2:8080';
+const String _iosSimulatorBase = 'http://localhost:8080';
 
-String get apiBase => kIsWeb ? _webBase : _mobileBase;
+String get apiBase {
+  if (kIsWeb) return _webBase;
 
-/// STOMP SockJS 엔드포인트 (Spring: /ws-chat + withSockJS)
+  if (Platform.isAndroid) {
+    return _androidEmulatorBase;
+  }
+
+  if (Platform.isIOS) {
+    return _iosSimulatorBase;
+  }
+
+  return _webBase;
+}
+
+/// STOMP SockJS 엔드포인트
 String get wsEndpoint => '$apiBase/ws-chat';
 
 /// Google OAuth 시작 URL
