@@ -42,15 +42,16 @@ PalDari/
 
 ## My Contributions
 
-As a backend-focused developer in a two-person team, I worked on:
+I primarily focused on backend development in a two-person team.
 
-- REST API design and implementation
-- JWT-based authentication and authorization
-- Google OAuth2 authentication
-- Email verification
-- WebSocket/STOMP-based real-time chat
-- Backend database and entity design
-- Integration between the Flutter application and Spring Boot backend
+- Designed and implemented REST APIs using Spring Boot
+- Implemented JWT-based authentication and authorization
+- Implemented Google OAuth2 authentication
+- Implemented email verification
+- Developed real-time chat using WebSocket/STOMP
+- Designed backend entities and database structure using JPA and MySQL
+- Integrated the external translation API into the chat service
+- Connected backend APIs with the Flutter client
 
 ## Performance Optimization Research
 
